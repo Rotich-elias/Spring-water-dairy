@@ -20,7 +20,6 @@ return new class extends Migration
             $table->string('device')->nullable();
             $table->timestamps();
 
-            $table->index(['auditable_type', 'auditable_id']);
             $table->index(['user_id']);
             $table->index(['created_at']);
         });

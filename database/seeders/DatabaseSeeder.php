@@ -2,24 +2,26 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        // User::factory(10)->create();
+        $this->call(RoleSeeder::class);
+        $this->call(LookupSeeder::class);
+        $this->call(BenchmarkSeeder::class);
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        // Initial Owner account from environment variables.
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+        $owner = \App\Models\User::factory()->create([
+            'name' => 'Owner',
+            'email' => env('APP_OWNER_EMAIL', 'owner@springwaterdairy.local'),
+            'password' => bcrypt(env('APP_OWNER_PASSWORD', 'change-me-immediately')),
         ]);
+        $role = \Spatie\Permission\Models\Role::firstOrCreate(
+            ['name' => 'Owner', 'guard_name' => 'api']
+        );
+        $owner->assignRole($role);
     }
 }

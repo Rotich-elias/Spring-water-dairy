@@ -14,6 +14,7 @@ return [
     */
 
     'name' => env('APP_NAME', 'Laravel'),
+    'login_rate_limit' => env('LOGIN_RATE_LIMIT', 5),
 
     /*
     |--------------------------------------------------------------------------
