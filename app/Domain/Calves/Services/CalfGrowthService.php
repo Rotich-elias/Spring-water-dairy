@@ -4,6 +4,7 @@ namespace App\Domain\Calves\Services;
 
 use App\Domain\Animals\Models\Animal;
 use App\Domain\Calves\Models\Weight;
+use App\Models\Lookup;
 use App\Models\Setting;
 use Carbon\Carbon;
 
@@ -114,5 +115,41 @@ class CalfGrowthService
             'ready_for_weaning' => $ageDays >= $weaningAgeDays && (float) $latestWeight >= $weaningWeightKg,
             'already_weaned' => $animal->calfRecord?->weaning_date !== null,
         ];
+    }
+
+    /**
+     * Compute overall ADG aggregate across all calves.
+     */
+    public function overallAdgAggregate(): ?float
+    {
+        $calves = Animal::query()
+            ->where('sex', 'F')
+            ->whereNull('exit_date')
+            ->whereNull('deleted_at')
+            ->whereIn('category_id', [$this->categoryIdFor('Calves')])
+            ->with('calfRecord', 'weights')
+            ->get();
+
+        $adgs = [];
+        foreach ($calves as $calf) {
+            $adg = $this->computeOverallAdg($calf);
+            if ($adg !== null) {
+                $adgs[] = $adg;
+            }
+        }
+
+        return empty($adgs) ? null : round(array_sum($adgs) / count($adgs), 3);
+    }
+
+    /**
+     * Helper: get lookups ID for category name.
+     */
+    private function categoryIdFor(string $name): ?int
+    {
+        return Lookup::query()
+            ->where('type', 'categories')
+            ->where('name', $name)
+            ->whereNull('deleted_at')
+            ->value('id');
     }
 }

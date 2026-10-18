@@ -1,30 +1,37 @@
 <?php
 
+use App\Domain\Breeding\Services\BreedingService;
+use App\Http\Controllers\Api\V1\AlertRulesController;
 use App\Http\Controllers\Api\V1\AnimalsController;
+use App\Http\Controllers\Api\V1\AuditController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BulkTankRecordsController;
 use App\Http\Controllers\Api\V1\CalfRecordsController;
 use App\Http\Controllers\Api\V1\CalvingsController;
+use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\HeatsController;
 use App\Http\Controllers\Api\V1\LactationsController;
 use App\Http\Controllers\Api\V1\LookupsController;
 use App\Http\Controllers\Api\V1\MilkRecordsController;
 use App\Http\Controllers\Api\V1\MilkSessionsController;
+use App\Http\Controllers\Api\V1\NotificationsController;
+use App\Http\Controllers\Api\V1\PdfReportController;
 use App\Http\Controllers\Api\V1\PregnancyChecksController;
+use App\Http\Controllers\Api\V1\ReportsController;
 use App\Http\Controllers\Api\V1\RolesController;
 use App\Http\Controllers\Api\V1\SemenStrawsController;
+use App\Http\Controllers\Api\V1\ServicesController;
 use App\Http\Controllers\Api\V1\SettingsController;
 use App\Http\Controllers\Api\V1\SetupController;
-use App\Http\Controllers\Api\V1\ServicesController;
 use App\Http\Controllers\Api\V1\SyncController;
+use App\Http\Controllers\Api\V1\TasksController;
 use App\Http\Controllers\Api\V1\TreatmentsController;
 use App\Http\Controllers\Api\V1\UsersController;
 use App\Http\Controllers\Api\V1\VaccinationsController;
 use App\Http\Controllers\Api\V1\WeightsController;
-use App\Domain\Breeding\Services\BreedingService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Route;
 
 // All Phase 1 endpoints live under /api/v1.
 Route::prefix('v1')->name('api.v1.')->group(function () {
@@ -151,11 +158,13 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
             Route::get('/calendar', function (Request $request) {
                 Gate::authorize('breeding.view');
+
                 return response()->json(['data' => app(BreedingService::class)->calendar($request->from, $request->to)]);
             })->name('calendar');
 
             Route::get('/kpis', function (Request $request) {
                 Gate::authorize('breeding.view');
+
                 return response()->json(['data' => app(BreedingService::class)->kpis($request->from, $request->to)]);
             })->name('kpis');
         });
@@ -178,7 +187,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::delete('/{weight}', [WeightsController::class, 'destroy'])->name('destroy');
         });
 
-        Route::get('/animals/{id}/growth', [WeightsController::class, 'growth'])->name('animals.growth');
+        Route::get('/animals/{animal}/growth', [WeightsController::class, 'growth'])->name('animals.growth');
 
         // Phase 5: Health
         Route::prefix('treatments')->name('treatments.')->group(function () {
@@ -198,6 +207,49 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
         Route::get('/health/sick-bay', [TreatmentsController::class, 'sickBay'])->name('sick-bay');
 
-        Route::get('/animals/{id}/health', [TreatmentsController::class, 'animalHealth'])->name('animals.health');
+        Route::get('/animals/{animal}/health', [TreatmentsController::class, 'animalHealth'])->name('animals.health');
+
+        // Phase 6: Dashboard & Alerts
+        Route::get('/dashboard/summary', [DashboardController::class, 'summary'])->name('dashboard.summary');
+        Route::get('/dashboard/stats', [DashboardController::class, 'summary'])->name('dashboard.stats');
+        Route::get('/dashboard/charts/milk-trend', [DashboardController::class, 'milkTrend'])->name('dashboard.milk-trend');
+        Route::get('/dashboard/charts/breed-share', [DashboardController::class, 'breedShare'])->name('dashboard.breed-share');
+        Route::get('/dashboard/charts/composition', [DashboardController::class, 'composition'])->name('dashboard.composition');
+        Route::get('/dashboard/upcoming', [DashboardController::class, 'upcoming'])->name('dashboard.upcoming');
+
+        Route::prefix('notifications')->name('notifications.')->group(function () {
+            Route::get('/', [NotificationsController::class, 'index'])->name('index');
+            Route::patch('/{notification}/read', [NotificationsController::class, 'markRead'])->name('read');
+            Route::post('/read-all', [NotificationsController::class, 'readAll'])->name('read-all');
+        });
+
+        Route::prefix('alert-rules')->name('alert-rules.')->group(function () {
+            Route::get('/', [AlertRulesController::class, 'index'])->name('index');
+            Route::post('/', [AlertRulesController::class, 'store'])->name('store');
+            Route::post('/generate', [AlertRulesController::class, 'generate'])->name('generate');
+            Route::get('/{alertRule}', [AlertRulesController::class, 'show'])->name('show');
+            Route::patch('/{alertRule}', [AlertRulesController::class, 'update'])->name('update');
+            Route::delete('/{alertRule}', [AlertRulesController::class, 'destroy'])->name('destroy');
+        });
+
+        Route::prefix('tasks')->name('tasks.')->group(function () {
+            Route::get('/', [TasksController::class, 'index'])->name('index');
+            Route::post('/', [TasksController::class, 'store'])->name('store');
+            Route::get('/{task}', [TasksController::class, 'show'])->name('show');
+            Route::patch('/{task}', [TasksController::class, 'update'])->name('update');
+            Route::delete('/{task}', [TasksController::class, 'destroy'])->name('destroy');
+        });
+
+        // Phase 7: Reports & Audit
+        Route::prefix('reports')->name('reports.')->group(function () {
+            Route::get('/', [ReportsController::class, 'index'])->name('index');
+            Route::get('/{type}', [ReportsController::class, 'show'])->name('show');
+            Route::get('/{type}/pdf', [PdfReportController::class, 'generate'])->name('pdf');
+        });
+
+        Route::prefix('audit-logs')->name('audit-logs.')->group(function () {
+            Route::get('/', [AuditController::class, 'index'])->name('index');
+            Route::get('/actions', [AuditController::class, 'actions'])->name('actions');
+        });
     });
 });

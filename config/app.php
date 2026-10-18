@@ -15,6 +15,7 @@ return [
 
     'name' => env('APP_NAME', 'Laravel'),
     'login_rate_limit' => env('LOGIN_RATE_LIMIT', 5),
+    'ear_tag_pattern' => env('EAR_TAG_PATTERN', '^[A-Z]{3,5}-\d{1,5}$'),
 
     /*
     |--------------------------------------------------------------------------

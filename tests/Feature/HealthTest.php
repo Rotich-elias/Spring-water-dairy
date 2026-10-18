@@ -2,41 +2,45 @@
 
 use App\Domain\Animals\Models\Animal;
 use App\Domain\Health\Models\Treatment;
-use App\Domain\Health\Models\Vaccination;
 use App\Models\Lookup;
+use App\Models\User;
 use Illuminate\Support\Str;
 
 function healthOwnerToken(): string
 {
-    $owner = \App\Models\User::where('email', 'owner@springwaterdairy.local')->first();
+    $owner = User::where('email', 'owner@springwaterdairy.local')->first();
+
     return $owner->createToken('test')->plainTextToken;
 }
 
 function healthManagerToken(): string
 {
-    $manager = \App\Models\User::factory()->create();
+    $manager = User::factory()->create();
     $manager->assignRole('Manager');
+
     return $manager->createToken('test')->plainTextToken;
 }
 
 function healthMilkerToken(): string
 {
-    $milker = \App\Models\User::factory()->create();
+    $milker = User::factory()->create();
     $milker->assignRole('Milker');
+
     return $milker->createToken('test')->plainTextToken;
 }
 
 function healthVetToken(): string
 {
-    $vet = \App\Models\User::factory()->create();
+    $vet = User::factory()->create();
     $vet->assignRole('Vet');
+
     return $vet->createToken('test')->plainTextToken;
 }
 
 test('owner can record a treatment', function () {
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
     $cow = Animal::factory()->female()->ofCategory($category->id)->create();
-    $condition = \App\Models\Lookup::where('type', 'health-conditions')->where('name', 'Mastitis')->first();
+    $condition = Lookup::where('type', 'health-conditions')->where('name', 'Mastitis')->first();
 
     $res = $this->withHeaders(['Authorization' => 'Bearer '.healthOwnerToken()])
         ->postJson('/api/v1/treatments', [
@@ -59,12 +63,12 @@ test('owner can record a treatment', function () {
     expect($data['meat_safe_date'])->toBe(now()->addDays(14)->toDateString().'T00:00:00.000000Z');
 });
 
-test('milker can record a treatment', function () {
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+test('milker cannot record a treatment (health.create intentionally omitted)', function () {
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
     $cow = Animal::factory()->female()->ofCategory($category->id)->create();
-    $condition = \App\Models\Lookup::where('type', 'health-conditions')->where('name', 'Mastitis')->first();
+    $condition = Lookup::where('type', 'health-conditions')->where('name', 'Mastitis')->first();
 
-    $res = $this->withHeaders(['Authorization' => 'Bearer '.healthMilkerToken()])
+    $this->withHeaders(['Authorization' => 'Bearer '.healthMilkerToken()])
         ->postJson('/api/v1/treatments', [
             'client_uuid' => (string) Str::uuid(),
             'animal_id' => $cow->id,
@@ -75,19 +79,18 @@ test('milker can record a treatment', function () {
             'route' => 'IM',
             'milk_withholding_days' => 4,
             'meat_withholding_days' => 14,
-        ]);
-
-    $res->assertStatus(201);
+        ])
+        ->assertStatus(403);
 });
 
 test('viewer cannot record a treatment', function () {
-    $viewer = \App\Models\User::factory()->create();
+    $viewer = User::factory()->create();
     $viewer->assignRole('Viewer');
     $token = $viewer->createToken('test')->plainTextToken;
 
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
     $cow = Animal::factory()->female()->ofCategory($category->id)->create();
-    $condition = \App\Models\Lookup::where('type', 'health-conditions')->where('name', 'Mastitis')->first();
+    $condition = Lookup::where('type', 'health-conditions')->where('name', 'Mastitis')->first();
 
     $this->withHeaders(['Authorization' => 'Bearer '.$token])
         ->postJson('/api/v1/treatments', [
@@ -112,7 +115,7 @@ test('male animal cannot receive treatment', function () {
             'client_uuid' => (string) Str::uuid(),
             'animal_id' => $bull->id,
             'treatment_date' => now()->toDateString(),
-            'condition_id' => \App\Models\Lookup::where('type', 'health-conditions')->where('name', 'Mastitis')->first()->id,
+            'condition_id' => Lookup::where('type', 'health-conditions')->where('name', 'Mastitis')->first()->id,
             'drug_name' => 'Test Drug',
             'dose' => '10ml',
             'route' => 'IM',
@@ -124,7 +127,7 @@ test('male animal cannot receive treatment', function () {
 });
 
 test('treatment is idempotent via client_uuid', function () {
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
     $cow = Animal::factory()->female()->ofCategory($category->id)->create();
     $uuid = (string) Str::uuid();
 
@@ -133,7 +136,7 @@ test('treatment is idempotent via client_uuid', function () {
             'client_uuid' => $uuid,
             'animal_id' => $cow->id,
             'treatment_date' => now()->toDateString(),
-            'condition_id' => \App\Models\Lookup::where('type', 'health-conditions')->where('name', 'Mastitis')->first()->id,
+            'condition_id' => Lookup::where('type', 'health-conditions')->where('name', 'Mastitis')->first()->id,
             'drug_name' => 'Test Drug',
             'dose' => '10ml',
             'route' => 'IM',
@@ -146,7 +149,7 @@ test('treatment is idempotent via client_uuid', function () {
             'client_uuid' => $uuid,
             'animal_id' => $cow->id,
             'treatment_date' => now()->toDateString(),
-            'condition_id' => \App\Models\Lookup::where('type', 'health-conditions')->where('name', 'Mastitis')->first()->id,
+            'condition_id' => Lookup::where('type', 'health-conditions')->where('name', 'Mastitis')->first()->id,
             'drug_name' => 'Different Drug',
             'dose' => '20ml',
             'route' => 'IV',
@@ -161,9 +164,9 @@ test('treatment is idempotent via client_uuid', function () {
 });
 
 test('sick bay returns animals in withholding', function () {
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
     $cow = Animal::factory()->female()->ofCategory($category->id)->create();
-    $condition = \App\Models\Lookup::where('type', 'health-conditions')->where('name', 'Mastitis')->first();
+    $condition = Lookup::where('type', 'health-conditions')->where('name', 'Mastitis')->first();
 
     Treatment::factory()->create([
         'animal_id' => $cow->id,
@@ -189,9 +192,9 @@ test('sick bay returns animals in withholding', function () {
 });
 
 test('animal health endpoint returns treatments and vaccinations', function () {
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
     $cow = Animal::factory()->female()->ofCategory($category->id)->create();
-    $condition = \App\Models\Lookup::where('type', 'health-conditions')->where('name', 'Mastitis')->first();
+    $condition = Lookup::where('type', 'health-conditions')->where('name', 'Mastitis')->first();
 
     Treatment::factory()->create([
         'animal_id' => $cow->id,
@@ -217,9 +220,9 @@ test('animal health endpoint returns treatments and vaccinations', function () {
 });
 
 test('vaccination record create and list', function () {
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
     $cow = Animal::factory()->female()->ofCategory($category->id)->create();
-    $condition = \App\Models\Lookup::where('type', 'health-conditions')->where('name', 'Mastitis')->first();
+    $condition = Lookup::where('type', 'health-conditions')->where('name', 'Mastitis')->first();
 
     $res = $this->withHeaders(['Authorization' => 'Bearer '.healthOwnerToken()])
         ->postJson('/api/v1/vaccinations', [
@@ -245,9 +248,9 @@ test('vaccination record create and list', function () {
 });
 
 test('vet can record vaccinations', function () {
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
     $cow = Animal::factory()->female()->ofCategory($category->id)->create();
-    $condition = \App\Models\Lookup::where('type', 'health-conditions')->where('name', 'Mastitis')->first();
+    $condition = Lookup::where('type', 'health-conditions')->where('name', 'Mastitis')->first();
 
     $this->withHeaders(['Authorization' => 'Bearer '.healthVetToken()])
         ->postJson('/api/v1/vaccinations', [
@@ -263,9 +266,9 @@ test('vet can record vaccinations', function () {
 });
 
 test('milker cannot record vaccinations', function () {
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
     $cow = Animal::factory()->female()->ofCategory($category->id)->create();
-    $condition = \App\Models\Lookup::where('type', 'health-conditions')->where('name', 'Mastitis')->first();
+    $condition = Lookup::where('type', 'health-conditions')->where('name', 'Mastitis')->first();
 
     $this->withHeaders(['Authorization' => 'Bearer '.healthMilkerToken()])
         ->postJson('/api/v1/vaccinations', [

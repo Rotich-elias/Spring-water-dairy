@@ -1,9 +1,10 @@
 <?php
 
 use App\Models\AuditLog;
+use App\Models\User;
 
 test('creating a user is audited automatically', function () {
-    $owner = \App\Models\User::where('email', 'owner@springwaterdairy.local')->first();
+    $owner = User::where('email', 'owner@springwaterdairy.local')->first();
     $token = $owner->createToken('test')->plainTextToken;
 
     $this->withHeader('Authorization', 'Bearer '.$token)
@@ -18,7 +19,7 @@ test('creating a user is audited automatically', function () {
         ->assertStatus(201);
 
     $audit = AuditLog::where('action', 'created')
-        ->where('auditable_type', \App\Models\User::class)
+        ->where('auditable_type', User::class)
         ->first();
 
     expect($audit)->not->toBeNull();
@@ -27,9 +28,9 @@ test('creating a user is audited automatically', function () {
 });
 
 test('updating a user is audited automatically', function () {
-    $owner = \App\Models\User::where('email', 'owner@springwaterdairy.local')->first();
+    $owner = User::where('email', 'owner@springwaterdairy.local')->first();
     $token = $owner->createToken('test')->plainTextToken;
-    $user = \App\Models\User::factory()->create(['name' => 'Original']);
+    $user = User::factory()->create(['name' => 'Original']);
 
     $this->withHeader('Authorization', 'Bearer '.$token)
         ->patchJson('/api/v1/users/'.$user->id, ['name' => 'Updated'])
@@ -50,5 +51,5 @@ test('audit logs cannot be created directly via API', function () {
 
     $this->withHeader('Authorization', 'Bearer '.$token)
         ->postJson('/api/v1/audit-logs', [])
-        ->assertStatus(404);
+        ->assertStatus(405);
 });

@@ -2,19 +2,18 @@
 
 namespace App\Domain\Animals\Models;
 
-use App\Domain\Milk\Models\MilkRecord;
-use App\Domain\Breeding\Models\Service;
+use App\Domain\Breeding\Models\Calving;
 use App\Domain\Breeding\Models\Heat;
 use App\Domain\Breeding\Models\PregnancyCheck;
-use App\Domain\Breeding\Models\Calving;
-use App\Domain\Calves\Models\Weight;
+use App\Domain\Breeding\Models\Service;
 use App\Domain\Calves\Models\CalfRecord;
+use App\Domain\Calves\Models\Weight;
 use App\Domain\Health\Models\Treatment;
 use App\Domain\Health\Models\Vaccination;
-use App\Domain\Health\Models\Treatment;
-use App\Domain\Health\Models\Vaccination;
-use App\Domain\Health\Models\Treatment;
-use App\Domain\Health\Models\Vaccination;
+use App\Domain\Milk\Models\MilkRecord;
+use App\Models\Lookup;
+use Carbon\Carbon;
+use Database\Factories\AnimalFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -22,7 +21,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Schema;
-use Carbon\Carbon;
+use Illuminate\Support\Str;
 
 class Animal extends Model
 {
@@ -57,34 +56,34 @@ class Animal extends Model
     {
         static::creating(function (Animal $animal) {
             if (blank($animal->client_uuid)) {
-                $animal->client_uuid = (string) \Illuminate\Support\Str::uuid();
+                $animal->client_uuid = (string) Str::uuid();
             }
         });
     }
 
     public static function newFactory()
     {
-        return \Database\Factories\AnimalFactory::new();
+        return AnimalFactory::new();
     }
 
     public function category(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\Lookup::class, 'category_id');
+        return $this->belongsTo(Lookup::class, 'category_id');
     }
 
     public function pen(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\Lookup::class, 'pen_id');
+        return $this->belongsTo(Lookup::class, 'pen_id');
     }
 
     public function status(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\Lookup::class, 'status_id');
+        return $this->belongsTo(Lookup::class, 'status_id');
     }
 
     public function breed(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\Lookup::class, 'breed_id');
+        return $this->belongsTo(Lookup::class, 'breed_id');
     }
 
     public function dam(): BelongsTo
@@ -148,7 +147,7 @@ class Animal extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Computed accessors (never stored; backend calculates these)       */
+    /*  Computed accessors (never stored; backend calculates these) */
     /* ------------------------------------------------------------------ */
 
     public function getAgeAttribute(): ?int
@@ -192,7 +191,7 @@ class Animal extends Model
         return (bool) $this->treatments()
             ->where(function ($q) {
                 $q->whereNull('milk_safe_date')
-                  ->orWhere('milk_safe_date', '>', now()->toDateString());
+                    ->orWhere('milk_safe_date', '>', now()->toDateString());
             })
             ->whereNull('deleted_at')
             ->exists();
@@ -223,7 +222,7 @@ class Animal extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                            */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
 
     public function scopeActive($query)
@@ -260,7 +259,7 @@ class Animal extends Model
     {
         return $query->where(function ($q) use ($text) {
             $q->where('ear_tag', 'like', '%'.$text.'%')
-              ->orWhere('name', 'like', '%'.$text.'%');
+                ->orWhere('name', 'like', '%'.$text.'%');
         });
     }
 }

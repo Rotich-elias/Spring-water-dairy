@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
 use App\Models\Setting;
+use Illuminate\Database\Seeder;
 
 class BenchmarkSeeder extends Seeder
 {
@@ -23,6 +23,10 @@ class BenchmarkSeeder extends Seeder
             'milk_withholding_default_days' => ['4', 'integer', 'health', true],
             'meat_withholding_default_days' => ['14', 'integer', 'health', true],
             'dashboard_cache_ttl_minutes' => ['15', 'integer', 'dashboard', true],
+            'farm_address' => ['Nairobi, Kenya', 'string', 'branding', true],
+            'farm_contact_phone' => ['+254 700 000 000', 'string', 'branding', true],
+            'farm_contact_email' => ['info@springwaterdairy.local', 'string', 'branding', true],
+            'farm_logo_path' => ['/images/farm-logo.png', 'string', 'branding', true],
         ];
 
         foreach ($benchmarks as $key => $row) {

@@ -5,12 +5,13 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 class RoleSeeder extends Seeder
 {
     public function run(): void
     {
-        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
 
         $roles = [
             'Owner' => [
@@ -23,7 +24,9 @@ class RoleSeeder extends Seeder
                 'calves.view', 'calves.create', 'calves.update',
                 'health.view', 'health.create', 'health.update', 'health.delete',
                 'dashboard.view', 'reports.view', 'audit.view',
-                'alerts.view', 'alerts.edit', 'notifications.view', 'tasks.view',
+                'alerts.view', 'alerts.create', 'alerts.edit', 'alerts.delete',
+                'notifications.view', 'notifications.create', 'notifications.update', 'notifications.delete',
+                'tasks.view', 'tasks.create', 'tasks.update', 'tasks.delete',
                 'system.health', 'setup.view', 'setup.complete',
             ],
             'Manager' => [
@@ -35,7 +38,9 @@ class RoleSeeder extends Seeder
                 'calves.view', 'calves.create', 'calves.update',
                 'health.view', 'health.create', 'health.update',
                 'dashboard.view', 'reports.view', 'audit.view',
-                'alerts.view', 'alerts.edit', 'notifications.view', 'tasks.view',
+                'alerts.view', 'alerts.create', 'alerts.edit', 'alerts.delete',
+                'notifications.view', 'notifications.create', 'notifications.update', 'notifications.delete',
+                'tasks.view', 'tasks.create', 'tasks.update', 'tasks.delete',
             ],
             'Milker' => [
                 'animals.view',
@@ -73,8 +78,7 @@ class RoleSeeder extends Seeder
         foreach ($roles as $roleName => $permissions) {
             $role = Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'api']);
 
-            $permissionModels = collect($permissions)->map(fn (string $name) =>
-                Permission::firstOrCreate(['name' => $name, 'guard_name' => 'api'])
+            $permissionModels = collect($permissions)->map(fn (string $name) => Permission::firstOrCreate(['name' => $name, 'guard_name' => 'api'])
             )->all();
 
             $role->syncPermissions($permissionModels);
