@@ -172,7 +172,7 @@ class DashboardService
         $composition = [];
         foreach ($categories as $c) {
             $count = Animal::query()
-                ->where('category_id', $c['category_id'])
+                ->where('category_id', $c['status_id'])
                 ->whereNull('exit_date')
                 ->whereNull('deleted_at')
                 ->count();

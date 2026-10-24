@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LoginRequest;
 use App\Http\Resources\UserResource;
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -30,10 +29,12 @@ class AuthController extends Controller
         }
 
         $user = Auth::user();
+        $expiration = config('sanctum.expiration');
+
         $token = $user->createToken(
             $request->input('device_name', 'app'),
             ['*'],
-            now()->addMinutes(config('sanctum.expiration', 1440))
+            $expiration ? now()->addMinutes((int) $expiration) : null
         )->plainTextToken;
 
         return response()->json([
