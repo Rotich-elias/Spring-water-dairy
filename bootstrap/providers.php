@@ -1,6 +1,9 @@
 <?php
 
+use App\Providers\AppServiceProvider;
+use App\Providers\AuditServiceProvider;
+
 return [
-    App\Providers\AppServiceProvider::class,
-    App\Providers\AuditServiceProvider::class,
+    AppServiceProvider::class,
+    AuditServiceProvider::class,
 ];

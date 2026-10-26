@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Milk\Models\BulkTankRecord;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\BulkTankStoreRequest;
 use App\Http\Resources\BulkTankRecordResource;
-use App\Domain\Milk\Models\BulkTankRecord;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 
@@ -19,7 +19,7 @@ class BulkTankRecordsController extends Controller
 
         if ($request->filled('from') && $request->filled('to')) {
             $query->whereDate('record_date', '>=', $request->from)
-                  ->whereDate('record_date', '<=', $request->to);
+                ->whereDate('record_date', '<=', $request->to);
         }
 
         $records = $query->orderByDesc('record_date')

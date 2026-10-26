@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Breeding\Models\PregnancyCheck;
+use App\Domain\Breeding\Services\BreedingService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\PregnancyCheckStoreRequest;
 use App\Http\Resources\PregnancyCheckResource;
-use App\Domain\Breeding\Models\PregnancyCheck;
-use App\Domain\Breeding\Services\BreedingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 

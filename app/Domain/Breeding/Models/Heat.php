@@ -3,10 +3,12 @@
 namespace App\Domain\Breeding\Models;
 
 use App\Domain\Animals\Models\Animal;
+use Database\Factories\HeatFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 class Heat extends Model
 {
@@ -30,7 +32,7 @@ class Heat extends Model
     {
         static::creating(function (Heat $heat) {
             if (blank($heat->client_uuid)) {
-                $heat->client_uuid = (string) \Illuminate\Support\Str::uuid();
+                $heat->client_uuid = (string) Str::uuid();
             }
         });
     }
@@ -42,6 +44,6 @@ class Heat extends Model
 
     public static function newFactory()
     {
-        return \Database\Factories\HeatFactory::new();
+        return HeatFactory::new();
     }
 }

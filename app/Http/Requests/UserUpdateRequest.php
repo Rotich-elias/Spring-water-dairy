@@ -10,6 +10,7 @@ class UserUpdateRequest extends FormRequest
     public function authorize(): bool
     {
         $user = $this->route('user');
+
         return $this->user()->can('users.update', $user);
     }
 

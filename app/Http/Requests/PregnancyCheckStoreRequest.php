@@ -2,8 +2,6 @@
 
 namespace App\Http\Requests;
 
-use App\Domain\Animals\Models\Animal;
-use App\Models\Lookup;
 use Illuminate\Foundation\Http\FormRequest;
 
 class PregnancyCheckStoreRequest extends FormRequest

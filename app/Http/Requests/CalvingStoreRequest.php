@@ -2,10 +2,7 @@
 
 namespace App\Http\Requests;
 
-use App\Domain\Animals\Models\Animal;
-use App\Models\Lookup;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class CalvingStoreRequest extends FormRequest
 {

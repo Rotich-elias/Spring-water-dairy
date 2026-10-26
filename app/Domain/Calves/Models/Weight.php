@@ -3,10 +3,12 @@
 namespace App\Domain\Calves\Models;
 
 use App\Domain\Animals\Models\Animal;
+use Database\Factories\WeightFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 class Weight extends Model
 {
@@ -34,7 +36,7 @@ class Weight extends Model
     {
         static::creating(function (Weight $weight) {
             if (blank($weight->client_uuid)) {
-                $weight->client_uuid = (string) \Illuminate\Support\Str::uuid();
+                $weight->client_uuid = (string) Str::uuid();
             }
         });
     }
@@ -46,6 +48,6 @@ class Weight extends Model
 
     public static function newFactory()
     {
-        return \Database\Factories\WeightFactory::new();
+        return WeightFactory::new();
     }
 }

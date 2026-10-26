@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Animals\Models\Animal;
+use App\Domain\Animals\Services\AnimalLifecycleService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AnimalBulkStoreRequest;
 use App\Http\Requests\AnimalExitRequest;
@@ -9,8 +11,6 @@ use App\Http\Requests\AnimalMoveRequest;
 use App\Http\Requests\AnimalStoreRequest;
 use App\Http\Requests\AnimalUpdateRequest;
 use App\Http\Resources\AnimalResource;
-use App\Domain\Animals\Models\Animal;
-use App\Domain\Animals\Services\AnimalLifecycleService;
 use App\Models\Lookup;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -106,6 +106,7 @@ class AnimalsController extends Controller
             if ($existing) {
                 $results[] = ['index' => $index, 'status' => 'created', 'id' => $existing->id];
                 $created++;
+
                 continue;
             }
 
@@ -133,7 +134,7 @@ class AnimalsController extends Controller
             }
 
             if (isset($rowData['birth_date']) && $rowData['birth_date'] !== null) {
-                if (! \Carbon\Carbon::parse($rowData['birth_date'])->lte(\Carbon\Carbon::today())) {
+                if (! Carbon::parse($rowData['birth_date'])->lte(Carbon::today())) {
                     $errors['birth_date'][] = 'The birth date cannot be in the future.';
                 }
             }
@@ -141,6 +142,7 @@ class AnimalsController extends Controller
             if (! empty($errors)) {
                 $results[] = ['index' => $index, 'status' => 'failed', 'errors' => $errors];
                 $failed++;
+
                 continue;
             }
 

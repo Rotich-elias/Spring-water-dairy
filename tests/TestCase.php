@@ -2,8 +2,10 @@
 
 namespace Tests;
 
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Illuminate\Http\Testing\Response;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -11,8 +13,6 @@ abstract class TestCase extends BaseTestCase
 
     /**
      * Seed roles, lookups, settings and the owner user before each test.
-     *
-     * @return void
      */
     protected function setUp(): void
     {
@@ -23,12 +23,10 @@ abstract class TestCase extends BaseTestCase
 
     /**
      * Authenticate as the seeded Owner and return the bearer token.
-     *
-     * @return string
      */
     protected function authenticateAsOwner(): string
     {
-        $owner = \App\Models\User::where('email', 'owner@springwaterdairy.local')->first();
+        $owner = User::where('email', 'owner@springwaterdairy.local')->first();
 
         $token = $owner->createToken('test')->plainTextToken;
 
@@ -38,10 +36,7 @@ abstract class TestCase extends BaseTestCase
     /**
      * Make an authenticated JSON request.
      *
-     * @param  string  $method
-     * @param  string  $uri
-     * @param  array  $body
-     * @return \Illuminate\Http\Testing\Response
+     * @return Response
      */
     protected function authJson(string $method, string $uri, array $body = [])
     {

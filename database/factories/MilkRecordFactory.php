@@ -2,12 +2,13 @@
 
 namespace Database\Factories;
 
-use Illuminate\Database\Eloquent\Factories\Factory;
-use App\Domain\Milk\Models\MilkRecord;
 use App\Domain\Animals\Models\Animal;
+use App\Domain\Milk\Models\MilkRecord;
+use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Domain\Milk\Models\MilkRecord>
+ * @extends Factory<MilkRecord>
  */
 class MilkRecordFactory extends Factory
 {
@@ -16,7 +17,7 @@ class MilkRecordFactory extends Factory
     public function definition(): array
     {
         return [
-            'client_uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'client_uuid' => (string) Str::uuid(),
             'animal_id' => Animal::factory(),
             'record_date' => fake()->dateTimeBetween('-30 days', 'today')->format('Y-m-d'),
             'session' => fake()->randomElement(['morning', 'evening']),

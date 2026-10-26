@@ -3,10 +3,12 @@
 namespace App\Domain\Milk\Models;
 
 use App\Domain\Animals\Models\Animal;
+use Database\Factories\MilkRecordFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 class MilkRecord extends Model
 {
@@ -39,7 +41,7 @@ class MilkRecord extends Model
     {
         static::creating(function (MilkRecord $record) {
             if (blank($record->client_uuid)) {
-                $record->client_uuid = (string) \Illuminate\Support\Str::uuid();
+                $record->client_uuid = (string) Str::uuid();
             }
         });
     }
@@ -66,6 +68,6 @@ class MilkRecord extends Model
 
     public static function newFactory()
     {
-        return \Database\Factories\MilkRecordFactory::new();
+        return MilkRecordFactory::new();
     }
 }

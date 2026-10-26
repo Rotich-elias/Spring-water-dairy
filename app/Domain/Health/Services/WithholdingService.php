@@ -37,11 +37,11 @@ class WithholdingService
             ->whereNull('deleted_at')
             ->where(function ($q) {
                 $q->whereNotNull('milk_safe_date')
-                  ->where('milk_safe_date', '>=', today())
-                  ->orWhere(function ($q2) {
-                      $q2->whereNotNull('meat_safe_date')
-                        ->where('meat_safe_date', '>=', today());
-                  });
+                    ->where('milk_safe_date', '>=', today())
+                    ->orWhere(function ($q2) {
+                        $q2->whereNotNull('meat_safe_date')
+                            ->where('meat_safe_date', '>=', today());
+                    });
             })
             ->exists();
     }
@@ -51,21 +51,21 @@ class WithholdingService
      */
     public function sickBay(): array
     {
-        $animals = \App\Domain\Animals\Models\Animal::query()
+        $animals = Animal::query()
             ->whereNull('exit_date')
             ->whereNull('deleted_at')
             ->where('sex', 'F')
             ->with(['treatments' => function ($q) {
                 $q->whereNull('deleted_at')
-                  ->where(function ($q2) {
-                      $q2->whereNotNull('milk_safe_date')
-                        ->where('milk_safe_date', '>=', today())
-                        ->orWhere(function ($q3) {
-                          $q3->whereNotNull('meat_safe_date')
-                            ->where('meat_safe_date', '>=', today());
-                        });
-                  })
-                  ->orderBy('created_at', 'desc');
+                    ->where(function ($q2) {
+                        $q2->whereNotNull('milk_safe_date')
+                            ->where('milk_safe_date', '>=', today())
+                            ->orWhere(function ($q3) {
+                                $q3->whereNotNull('meat_safe_date')
+                                    ->where('meat_safe_date', '>=', today());
+                            });
+                    })
+                    ->orderBy('created_at', 'desc');
             }])
             ->get();
 

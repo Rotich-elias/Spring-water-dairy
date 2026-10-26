@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Http\Controllers\Controller;
-use App\Domain\Milk\Models\SyncState;
 use App\Domain\Animals\Models\Animal;
 use App\Domain\Milk\Models\MilkRecord;
+use App\Domain\Milk\Models\SyncState;
+use App\Domain\Milk\SyncStateObserver;
+use App\Http\Controllers\Controller;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 
 class SyncController extends Controller
@@ -18,45 +21,42 @@ class SyncController extends Controller
      */
     public function changes(Request $request)
     {
-        Gate::authorize('milk.view');
+        Gate::authorize('animals.view');
 
         $since = $request->input('since');
         if (blank($since)) {
             $since = now()->subDays(7)->toISOString();
         }
 
-        $since = \Carbon\Carbon::parse($since);
+        $since = Carbon::parse($since);
 
-        // Changed records since the timestamp
         $changed = SyncState::query()
             ->where('changed_at', '>=', $since)
-            ->orderBy('changed_at')
-            ->get();
+            ->orderByDesc('changed_at')
+            ->get()
+            ->unique(fn (SyncState $state) => $state->model.'#'.$state->record_id)
+            ->values();
 
-        $deleted = $changed->where('action', 'deleted')->map(fn ($s) => [
-            'type' => $s->model,
-            'id' => $s->record_id,
-        ])->values()->all();
+        $deleted = $changed
+            ->where('action', 'deleted')
+            ->map(fn (SyncState $state) => [
+                'type' => SyncStateObserver::typeFor($state->model),
+                'id' => $state->record_id,
+            ])
+            ->values()
+            ->all();
 
-        $updated = $changed->where('action', '!=', 'deleted')->map(fn ($s) => [
-            'type' => $s->model,
-            'id' => $s->record_id,
-            'changed_at' => $s->changed_at,
-        ])->values()->all();
+        $updated = $this->updatedRecords($changed->where('action', '!=', 'deleted'));
 
-        // Active animals (lightweight for cache refresh)
         $animals = Animal::query()
             ->whereNull('exit_date')
             ->whereNull('deleted_at')
-            ->when($since, fn ($q) => $q->where('updated_at', '>=', $since))
-            ->select(['id', 'ear_tag', 'category_id', 'status_id', 'pen_id', 'updated_at'])
+            ->when($since, fn ($query) => $query->where('updated_at', '>=', $since))
             ->get();
 
-        // Today's milk sheet
-        $today = now()->toDateString();
         $milkSheet = MilkRecord::query()
-            ->where('record_date', $today)
-            ->when($since, fn ($q) => $q->where('updated_at', '>=', $since))
+            ->where('record_date', now()->toDateString())
+            ->when($since, fn ($query) => $query->where('updated_at', '>=', $since))
             ->get();
 
         return response()->json(['data' => [
@@ -66,5 +66,40 @@ class SyncController extends Controller
             'animals' => $animals,
             'milk_sheet' => $milkSheet,
         ]]);
+    }
+
+    /**
+     * Hydrate sync-state rows into full records for offline caching.
+     *
+     * @param  Collection<int, SyncState>  $states
+     * @return array<int, array{type: string, id: int, changed_at: string|null, data: array<string, mixed>|null}>
+     */
+    private function updatedRecords(Collection $states): array
+    {
+        $updated = [];
+
+        foreach ($states->groupBy('model') as $modelClass => $rows) {
+            if (! class_exists($modelClass)) {
+                continue;
+            }
+
+            $records = $modelClass::query()
+                ->whereIn((new $modelClass)->getKeyName(), $rows->pluck('record_id'))
+                ->get()
+                ->keyBy(fn ($record) => $record->getKey());
+
+            foreach ($rows as $state) {
+                $record = $records->get($state->record_id);
+
+                $updated[] = [
+                    'type' => SyncStateObserver::typeFor($modelClass),
+                    'id' => $state->record_id,
+                    'changed_at' => $state->changed_at?->toISOString(),
+                    'data' => $record?->toArray(),
+                ];
+            }
+        }
+
+        return $updated;
     }
 }

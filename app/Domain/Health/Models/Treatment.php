@@ -4,11 +4,13 @@ namespace App\Domain\Health\Models;
 
 use App\Domain\Animals\Models\Animal;
 use App\Models\Lookup;
+use Carbon\Carbon;
+use Database\Factories\TreatmentFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Carbon\Carbon;
+use Illuminate\Support\Str;
 
 class Treatment extends Model
 {
@@ -42,7 +44,7 @@ class Treatment extends Model
     {
         static::creating(function (Treatment $treatment) {
             if (blank($treatment->client_uuid)) {
-                $treatment->client_uuid = (string) \Illuminate\Support\Str::uuid();
+                $treatment->client_uuid = (string) Str::uuid();
             }
         });
     }
@@ -59,7 +61,7 @@ class Treatment extends Model
 
     public static function newFactory()
     {
-        return \Database\Factories\TreatmentFactory::new();
+        return TreatmentFactory::new();
     }
 
     public function isInWithholding(): bool
@@ -70,6 +72,7 @@ class Treatment extends Model
         if ($this->meat_safe_date && Carbon::today()->lte($this->meat_safe_date)) {
             return true;
         }
+
         return false;
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -26,7 +27,7 @@ class AppServiceProvider extends ServiceProvider
         // Delegate every Gate::allows() check to spatie's hasPermissionTo() so that
         // permissions stored in the database (and seeded after providers boot) are
         // enforced by controllers using $this->authorize() / Gate::allows().
-        Gate::before(function (?\App\Models\User $user, string $ability): ?bool {
+        Gate::before(function (?User $user, string $ability): ?bool {
             if (! $user) {
                 return null;
             }

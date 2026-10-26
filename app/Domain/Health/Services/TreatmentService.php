@@ -23,7 +23,7 @@ class TreatmentService
      *   milk_withholding_days: int,
      *   meat_withholding_days: int,
      * }  $data
-     * @return Treatment
+     *
      * @throws ValidationException if animal is male or withholding override rules violated
      */
     public function recordTreatment(array $data): Treatment
@@ -45,7 +45,7 @@ class TreatmentService
                 ]);
             }
 
-            $withholdingService = new \App\Domain\Health\Services\WithholdingService();
+            $withholdingService = new WithholdingService;
             $safeDates = $withholdingService->computeSafeDates(
                 $data['treatment_date'],
                 $data['milk_withholding_days'] ?? 0,
@@ -65,7 +65,8 @@ class TreatmentService
      */
     public function sickBay(): array
     {
-        $withholdingService = new \App\Domain\Health\Services\WithholdingService();
+        $withholdingService = new WithholdingService;
+
         return $withholdingService->sickBay();
     }
 }

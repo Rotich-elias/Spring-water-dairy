@@ -41,6 +41,32 @@ class SyncStateObserver
         Lactation::class,
     ];
 
+    /**
+     * Friendly entity names exposed to offline clients.
+     *
+     * @var array<class-string, string>
+     */
+    public static array $entityTypes = [
+        Animal::class => 'animals',
+        MilkRecord::class => 'milk_records',
+        Treatment::class => 'treatments',
+        Vaccination::class => 'vaccinations',
+        Weight::class => 'weights',
+        CalfRecord::class => 'calf_records',
+        Service::class => 'services',
+        Heat::class => 'heats',
+        Calving::class => 'calvings',
+        PregnancyCheck::class => 'pregnancy_checks',
+        SemenStraw::class => 'semen_straws',
+        BulkTankRecord::class => 'bulk_tank_records',
+        Lactation::class => 'lactations',
+    ];
+
+    public static function typeFor(string $modelClass): string
+    {
+        return self::$entityTypes[$modelClass] ?? class_basename($modelClass);
+    }
+
     public function created(Model $model): void
     {
         $this->record($model, 'created');

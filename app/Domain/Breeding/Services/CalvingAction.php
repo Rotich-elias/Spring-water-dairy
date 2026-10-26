@@ -6,11 +6,11 @@ use App\Domain\Animals\Models\Animal;
 use App\Domain\Breeding\Models\Calving;
 use App\Domain\Calves\Models\CalfRecord;
 use App\Domain\Milk\Models\Lactation;
-use App\Domain\Milk\Services\LactationService;
 use App\Models\Lookup;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class CalvingAction
 {
@@ -61,7 +61,7 @@ class CalvingAction
             $calfAnimals = [];
             foreach ($data['calves'] as $calfData) {
                 $calf = Animal::create([
-                    'client_uuid' => \Illuminate\Support\Str::uuid(),
+                    'client_uuid' => Str::uuid(),
                     'ear_tag' => $calfData['ear_tag'],
                     'name' => null,
                     'category_id' => $this->categoryIdFor('Calves'),
@@ -133,16 +133,16 @@ class CalvingAction
 
     protected function categoryIdFor(string $name): ?int
     {
-        return \App\Models\Lookup::where('type', 'categories')->where('name', $name)->whereNull('deleted_at')->value('id');
+        return Lookup::where('type', 'categories')->where('name', $name)->whereNull('deleted_at')->value('id');
     }
 
     protected function penIdFor(string $name): ?int
     {
-        return \App\Models\Lookup::where('type', 'pens')->where('name', $name)->whereNull('deleted_at')->value('id');
+        return Lookup::where('type', 'pens')->where('name', $name)->whereNull('deleted_at')->value('id');
     }
 
     protected function statusIdFor(string $name): ?int
     {
-        return \App\Models\Lookup::where('type', 'animal-statuses')->where('name', $name)->whereNull('deleted_at')->value('id');
+        return Lookup::where('type', 'animal-statuses')->where('name', $name)->whereNull('deleted_at')->value('id');
     }
 }

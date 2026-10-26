@@ -3,7 +3,10 @@
 namespace App\Domain\Reports\Services;
 
 use App\Models\Setting;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 class PdfReportService
 {
@@ -55,8 +58,27 @@ class PdfReportService
     }
 
     /**
-     * List available report types for PDF generation.
+     * Render a report as a downloadable PDF.
      *
+     * @param  array<string, mixed>  $filters
+     */
+    public function render(string $type, array $filters = []): Response
+    {
+        $report = $this->prepare($type, $filters);
+
+        $pdf = Pdf::loadView('reports.pdf', [
+            'branding' => $report['branding'],
+            'title' => $this->titleFor($type),
+            'generatedAt' => now()->format('d M Y H:i'),
+            'rows' => $this->rowsFor($report['data']),
+            'columns' => $this->columnsFor($report['data']),
+            'isSummary' => $this->isSummary($report['data']),
+        ])->setPaper('a4');
+
+        return $pdf->download($this->filename($type));
+    }
+
+    /**
      * @return Collection<int, array{id: string, name: string, description: string}>
      */
     public function availableTypes(): Collection
@@ -66,5 +88,44 @@ class PdfReportService
             'name' => $report['name'],
             'description' => $report['description'],
         ]);
+    }
+
+    private function titleFor(string $type): string
+    {
+        return $this->reports->list()->firstWhere('id', $type)['name'] ?? Str::headline($type);
+    }
+
+    /**
+     * @return array<int|string, mixed>
+     */
+    private function rowsFor(mixed $data): array
+    {
+        return is_array($data) ? $data : [];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function columnsFor(mixed $data): array
+    {
+        if (! is_array($data) || $data === [] || $this->isSummary($data)) {
+            return [];
+        }
+
+        return array_keys(reset($data));
+    }
+
+    private function isSummary(mixed $data): bool
+    {
+        if (! is_array($data) || $data === []) {
+            return false;
+        }
+
+        return ! is_array(reset($data));
+    }
+
+    private function filename(string $type): string
+    {
+        return Str::slug($type).'-'.now()->format('Y-m-d').'.pdf';
     }
 }

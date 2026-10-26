@@ -2,9 +2,7 @@
 
 namespace App\Http\Requests;
 
-use App\Domain\Animals\Models\Animal;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class VaccinationStoreRequest extends FormRequest
 {

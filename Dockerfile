@@ -2,27 +2,28 @@ FROM php:8.4-fpm
 
 WORKDIR /var/www
 
-# System dependencies
-RUN apt-get update && apt-get install -y \
-    git curl zip unzip libpng-dev libonig-dev libxml2-dev libsqlite3-dev \
-    libzip-dev libicu-dev libpq-dev default-mysql-client \
-    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd intl zip opcache \
-    && pecl install redis && docker-php-ext-enable redis \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+# System dependencies and PHP extensions
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git curl zip unzip libpng-dev libonig-dev libxml2-dev libsqlite3-dev \
+        libzip-dev libicu-dev libpq-dev default-mysql-client \
+    && docker-php-ext-install pdo_mysql pdo_sqlite mbstring exif pcntl bcmath gd intl zip opcache \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Node (for Vite build in CI only)
-RUN apt-get update && apt-get install -y curl gnupg \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+COPY composer.json composer.lock ./
+RUN composer install --no-interaction --prefer-dist --no-dev --no-scripts --no-autoloader
 
-COPY . /var/www
+COPY . .
 
-RUN composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev \
-    && php artisan optimize:clear 2>/dev/null || true
+RUN composer dump-autoload --optimize \
+    && chmod +x docker-entrypoint.sh
 
-EXPOSE 8000
-CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
+EXPOSE 9000
+
+ENTRYPOINT ["/var/www/docker-entrypoint.sh"]
+CMD ["php-fpm"]

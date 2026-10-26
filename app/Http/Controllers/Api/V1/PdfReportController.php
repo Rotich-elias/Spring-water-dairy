@@ -11,8 +11,7 @@ class PdfReportController extends Controller
     public function __construct(private PdfReportService $pdfReports) {}
 
     /**
-     * Generate a PDF report (returns report data + farm branding;
-     * PDF rendering requires a PDF library such as dompdf).
+     * Generate a downloadable PDF report for the farm.
      */
     public function generate(string $type, Request $request)
     {
@@ -20,14 +19,6 @@ class PdfReportController extends Controller
 
         $filters = $request->only(['from', 'to']);
 
-        $report = $this->pdfReports->prepare($type, $filters);
-
-        return response()->json([
-            'data' => $report,
-            'meta' => [
-                'pdf_rendering' => 'pending_library',
-                'message' => 'Report data prepared. Install a PDF library (e.g. dompdf/barryvdh-laravel-snappy) to render PDF.',
-            ],
-        ]);
+        return $this->pdfReports->render($type, $filters);
     }
 }

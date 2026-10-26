@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Http\Controllers\Controller;
-use App\Http\Requests\LactationDryOffRequest;
-use App\Http\Resources\LactationResource;
 use App\Domain\Animals\Models\Animal;
 use App\Domain\Milk\Models\Lactation;
 use App\Domain\Milk\Models\MilkRecord;
 use App\Domain\Milk\Services\LactationService;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\LactationDryOffRequest;
+use App\Http\Resources\LactationResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 

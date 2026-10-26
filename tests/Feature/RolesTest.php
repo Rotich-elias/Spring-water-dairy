@@ -1,6 +1,6 @@
 <?php
 
-use Spatie\Permission\Models\Role;
+use App\Models\User;
 
 test('roles list includes permissions', function () {
     $token = $this->authenticateAsOwner();
@@ -18,7 +18,7 @@ test('roles list includes permissions', function () {
 });
 
 test('non-owner cannot list roles', function () {
-    $milker = \App\Models\User::factory()->create();
+    $milker = User::factory()->create();
     $milker->assignRole('Milker');
     $token = $milker->createToken('test')->plainTextToken;
 

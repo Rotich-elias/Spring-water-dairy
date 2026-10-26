@@ -3,6 +3,7 @@
 namespace App\Domain\Calves\Models;
 
 use App\Domain\Animals\Models\Animal;
+use Database\Factories\CalfRecordFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -43,6 +44,6 @@ class CalfRecord extends Model
 
     public static function newFactory()
     {
-        return \Database\Factories\CalfRecordFactory::new();
+        return CalfRecordFactory::new();
     }
 }

@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Http\Controllers\Controller;
-use App\Http\Requests\CalvingStoreRequest;
-use App\Http\Resources\CalvingResource;
 use App\Domain\Breeding\Models\Calving;
 use App\Domain\Breeding\Services\CalvingAction;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\CalvingStoreRequest;
+use App\Http\Resources\AnimalResource;
+use App\Http\Resources\CalvingResource;
+use App\Http\Resources\LactationResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 
@@ -49,9 +51,9 @@ class CalvingsController extends Controller
         return response()->json([
             'data' => [
                 'calving' => new CalvingResource($result['calving']->load(['dam', 'easeScore'])),
-                'calves' => \App\Http\Resources\AnimalResource::collection($result['calves']),
-                'lactation' => new \App\Http\Resources\LactationResource($result['lactation']),
-                'dam' => new \App\Http\Resources\AnimalResource($result['dam']->load(['category', 'pen', 'status', 'breed'])),
+                'calves' => AnimalResource::collection($result['calves']),
+                'lactation' => new LactationResource($result['lactation']),
+                'dam' => new AnimalResource($result['dam']->load(['category', 'pen', 'status', 'breed'])),
             ],
         ], 201);
     }

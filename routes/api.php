@@ -2,6 +2,7 @@
 
 use App\Domain\Breeding\Services\BreedingService;
 use App\Http\Controllers\Api\V1\AlertRulesController;
+use App\Http\Controllers\Api\V1\AlertsController;
 use App\Http\Controllers\Api\V1\AnimalsController;
 use App\Http\Controllers\Api\V1\AuditController;
 use App\Http\Controllers\Api\V1\AuthController;
@@ -24,6 +25,7 @@ use App\Http\Controllers\Api\V1\ServicesController;
 use App\Http\Controllers\Api\V1\SettingsController;
 use App\Http\Controllers\Api\V1\SetupController;
 use App\Http\Controllers\Api\V1\SyncController;
+use App\Http\Controllers\Api\V1\SystemHealthController;
 use App\Http\Controllers\Api\V1\TasksController;
 use App\Http\Controllers\Api\V1\TreatmentsController;
 use App\Http\Controllers\Api\V1\UsersController;
@@ -61,7 +63,10 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
         Route::prefix('lookups')->name('lookups.')->group(function () {
             Route::get('/all', [LookupsController::class, 'all'])->name('all');
+            Route::post('/', [LookupsController::class, 'store'])->name('store');
             Route::get('/{type}', [LookupsController::class, 'byType'])->name('byType');
+            Route::patch('/{lookup}', [LookupsController::class, 'update'])->name('update');
+            Route::delete('/{lookup}', [LookupsController::class, 'destroy'])->name('destroy');
         });
 
         Route::prefix('setup')->name('setup.')->group(function () {
@@ -159,13 +164,27 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::get('/calendar', function (Request $request) {
                 Gate::authorize('breeding.view');
 
-                return response()->json(['data' => app(BreedingService::class)->calendar($request->from, $request->to)]);
+                $range = $request->validate([
+                    'from' => ['required', 'date'],
+                    'to' => ['required', 'date', 'after_or_equal:from'],
+                ]);
+
+                return response()->json([
+                    'data' => app(BreedingService::class)->calendar($range['from'], $range['to']),
+                ]);
             })->name('calendar');
 
             Route::get('/kpis', function (Request $request) {
                 Gate::authorize('breeding.view');
 
-                return response()->json(['data' => app(BreedingService::class)->kpis($request->from, $request->to)]);
+                $range = $request->validate([
+                    'from' => ['required', 'date'],
+                    'to' => ['required', 'date', 'after_or_equal:from'],
+                ]);
+
+                return response()->json([
+                    'data' => app(BreedingService::class)->kpis($range['from'], $range['to']),
+                ]);
             })->name('kpis');
         });
 
@@ -223,6 +242,13 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::post('/read-all', [NotificationsController::class, 'readAll'])->name('read-all');
         });
 
+        Route::prefix('alerts')->name('alerts.')->group(function () {
+            Route::get('/', [AlertsController::class, 'index'])->name('index');
+            Route::post('/generate', [AlertsController::class, 'generate'])->name('generate');
+            Route::patch('/{alert}/read', [AlertsController::class, 'read'])->name('read');
+            Route::patch('/{alert}/dismiss', [AlertsController::class, 'dismiss'])->name('dismiss');
+        });
+
         Route::prefix('alert-rules')->name('alert-rules.')->group(function () {
             Route::get('/', [AlertRulesController::class, 'index'])->name('index');
             Route::post('/', [AlertRulesController::class, 'store'])->name('store');
@@ -251,5 +277,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::get('/', [AuditController::class, 'index'])->name('index');
             Route::get('/actions', [AuditController::class, 'actions'])->name('actions');
         });
+
+        Route::get('/system/health', SystemHealthController::class)->name('system.health');
     });
 });

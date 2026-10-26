@@ -1,36 +1,40 @@
 <?php
 
 use App\Domain\Animals\Models\Animal;
-use App\Domain\Breeding\Models\Heat;
-use App\Domain\Breeding\Models\Service;
 use App\Domain\Breeding\Models\Calving;
+use App\Domain\Breeding\Models\Heat;
 use App\Domain\Breeding\Models\PregnancyCheck;
 use App\Domain\Breeding\Models\SemenStraw;
-use App\Domain\Calves\Models\Weight;
+use App\Domain\Breeding\Models\Service;
+use App\Models\Lookup;
+use App\Models\User;
 use Illuminate\Support\Str;
 
 function breedingOwnerToken(): string
 {
-    $owner = \App\Models\User::where('email', 'owner@springwaterdairy.local')->first();
+    $owner = User::where('email', 'owner@springwaterdairy.local')->first();
+
     return $owner->createToken('test')->plainTextToken;
 }
 
 function breedingMilkerToken(): string
 {
-    $milker = \App\Models\User::factory()->create();
+    $milker = User::factory()->create();
     $milker->assignRole('Milker');
+
     return $milker->createToken('test')->plainTextToken;
 }
 
 function breedingVetToken(): string
 {
-    $vet = \App\Models\User::factory()->create();
+    $vet = User::factory()->create();
     $vet->assignRole('Vet');
+
     return $vet->createToken('test')->plainTextToken;
 }
 
 test('owner can record a heat', function () {
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
     $cow = Animal::factory()->female()->ofCategory($category->id)->create();
 
     $res = $this->withHeaders(['Authorization' => 'Bearer '.breedingOwnerToken()])
@@ -48,7 +52,7 @@ test('owner can record a heat', function () {
 });
 
 test('milker cannot record a heat (403)', function () {
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
     $cow = Animal::factory()->female()->ofCategory($category->id)->create();
 
     $this->withHeaders(['Authorization' => 'Bearer '.breedingMilkerToken()])
@@ -61,7 +65,7 @@ test('milker cannot record a heat (403)', function () {
 });
 
 test('service computes gestation dates', function () {
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
     $cow = Animal::factory()->female()->ofCategory($category->id)->create();
     $straw = SemenStraw::factory()->create(['bull_code' => 'BULL-001', 'quantity' => 10]);
 
@@ -86,7 +90,7 @@ test('service computes gestation dates', function () {
 });
 
 test('service on already-pregnant cow is rejected unless overridden', function () {
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
     $cow = Animal::factory()->female()->ofCategory($category->id)->create();
 
     // First service
@@ -99,9 +103,9 @@ test('service on already-pregnant cow is rejected unless overridden', function (
         ]);
 
     // Mark first service as pregnant via PD check
-    $pdResult = \App\Models\Lookup::where('type', 'pd-results')->where('name', 'Pregnant')->first();
+    $pdResult = Lookup::where('type', 'pd-results')->where('name', 'Pregnant')->first();
     if (! $pdResult) {
-        $pdResult = \App\Models\Lookup::factory()->create(['type' => 'pd-results', 'name' => 'Pregnant', 'active' => true]);
+        $pdResult = Lookup::factory()->create(['type' => 'pd-results', 'name' => 'Pregnant', 'active' => true]);
     }
     PregnancyCheck::factory()->create([
         'animal_id' => $cow->id,
@@ -140,7 +144,7 @@ test('service on already-pregnant cow is rejected unless overridden', function (
 });
 
 test('vet can view services', function () {
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
     Animal::factory()->count(3)->female()->ofCategory($category->id)->create();
 
     $this->withHeaders(['Authorization' => 'Bearer '.breedingVetToken()])
@@ -149,11 +153,11 @@ test('vet can view services', function () {
 });
 
 test('calving creates calves, lactation, and dam updates atomically', function () {
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
     $dam = Animal::factory()->female()->ofCategory($category->id)->create();
-    $easeScore = \App\Models\Lookup::where('type', 'calving-ease-scores')->where('name', 'Unassisted')->first();
+    $easeScore = Lookup::where('type', 'calving-ease-scores')->where('name', 'Unassisted')->first();
     if (! $easeScore) {
-        $easeScore = \App\Models\Lookup::factory()->create(['type' => 'calving-ease-scores', 'name' => 'Unassisted', 'active' => true]);
+        $easeScore = Lookup::factory()->create(['type' => 'calving-ease-scores', 'name' => 'Unassisted', 'active' => true]);
     }
 
     $res = $this->withHeaders(['Authorization' => 'Bearer '.breedingOwnerToken()])
@@ -207,7 +211,7 @@ test('calving creates calves, lactation, and dam updates atomically', function (
 });
 
 test('duplicate calf ear tag is rejected', function () {
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
     $dam = Animal::factory()->female()->ofCategory($category->id)->create();
     Animal::factory()->create(['ear_tag' => 'CALF-DUP', 'category_id' => $category->id]);
 
@@ -235,11 +239,11 @@ test('duplicate calf ear tag is rejected', function () {
 });
 
 test('owner can record pregnancy check and updates animal status', function () {
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
     $cow = Animal::factory()->female()->ofCategory($category->id)->create();
-    $pdResult = \App\Models\Lookup::where('type', 'pd-results')->where('name', 'Pregnant')->first();
+    $pdResult = Lookup::where('type', 'pd-results')->where('name', 'Pregnant')->first();
     if (! $pdResult) {
-        $pdResult = \App\Models\Lookup::factory()->create(['type' => 'pd-results', 'name' => 'Pregnant', 'active' => true]);
+        $pdResult = Lookup::factory()->create(['type' => 'pd-results', 'name' => 'Pregnant', 'active' => true]);
     }
 
     $res = $this->withHeaders(['Authorization' => 'Bearer '.breedingOwnerToken()])
@@ -260,7 +264,7 @@ test('owner can record pregnancy check and updates animal status', function () {
 });
 
 test('breeding calendar returns events', function () {
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
     $cow = Animal::factory()->female()->ofCategory($category->id)->create();
 
     Service::factory()->create([
@@ -293,6 +297,20 @@ test('breeding KPIs return values', function () {
     $data = $res->json('data');
     expect($data)->toHaveKeys(['conception_rate', 'services_per_conception', 'days_open', 'calving_interval']);
     expect($data['conception_rate'])->toBeNumeric();
+});
+
+test('breeding calendar and kpis require a valid date range', function () {
+    $token = breedingOwnerToken();
+
+    $this->withHeaders(['Authorization' => 'Bearer '.$token])
+        ->getJson('/api/v1/breeding/calendar')
+        ->assertStatus(422)
+        ->assertJsonPath('error.code', 'validation_failed');
+
+    $this->withHeaders(['Authorization' => 'Bearer '.$token])
+        ->getJson('/api/v1/breeding/kpis?from=2026-12-31&to=2026-01-01')
+        ->assertStatus(422)
+        ->assertJsonPath('error.code', 'validation_failed');
 });
 
 test('semen straws CRUD', function () {

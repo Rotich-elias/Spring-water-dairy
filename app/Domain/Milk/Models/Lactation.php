@@ -3,11 +3,12 @@
 namespace App\Domain\Milk\Models;
 
 use App\Domain\Animals\Models\Animal;
+use Carbon\Carbon;
+use Database\Factories\LactationFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Carbon\Carbon;
 
 class Lactation extends Model
 {
@@ -58,6 +59,6 @@ class Lactation extends Model
 
     public static function newFactory()
     {
-        return \Database\Factories\LactationFactory::new();
+        return LactationFactory::new();
     }
 }

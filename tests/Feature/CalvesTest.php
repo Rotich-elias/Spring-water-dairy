@@ -2,24 +2,27 @@
 
 use App\Domain\Animals\Models\Animal;
 use App\Domain\Calves\Models\Weight;
-use App\Domain\Calves\Models\CalfRecord;
+use App\Models\Lookup;
+use App\Models\User;
 use Illuminate\Support\Str;
 
 function calvesOwnerToken(): string
 {
-    $owner = \App\Models\User::where('email', 'owner@springwaterdairy.local')->first();
+    $owner = User::where('email', 'owner@springwaterdairy.local')->first();
+
     return $owner->createToken('test')->plainTextToken;
 }
 
 function calvesViewerToken(): string
 {
-    $viewer = \App\Models\User::factory()->create();
+    $viewer = User::factory()->create();
     $viewer->assignRole('Viewer');
+
     return $viewer->createToken('test')->plainTextToken;
 }
 
 test('owner can record a weight', function () {
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Calves')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Calves')->first();
     $calf = Animal::factory()->ofCategory($category->id)->create();
     Animal::factory()->create([
         'ear_tag' => 'CALF-WEIGHT-PREV',
@@ -48,7 +51,7 @@ test('owner can record a weight', function () {
 });
 
 test('weight idempotent via client_uuid', function () {
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Calves')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Calves')->first();
     $calf = Animal::factory()->ofCategory($category->id)->create();
     $uuid = (string) Str::uuid();
 
@@ -76,7 +79,7 @@ test('weight idempotent via client_uuid', function () {
 });
 
 test('viewer can view weights', function () {
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Calves')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Calves')->first();
     $calf = Animal::factory()->ofCategory($category->id)->create();
 
     $this->withHeaders(['Authorization' => 'Bearer '.calvesViewerToken()])
@@ -85,11 +88,11 @@ test('viewer can view weights', function () {
 });
 
 test('animal growth endpoint returns series with benchmark', function () {
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Calves')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Calves')->first();
     $calf = Animal::factory()->ofCategory($category->id)->create([
         'birth_date' => '2026-09-01',
     ]);
-    \App\Models\Lookup::factory()->create(['type' => 'calf-records', 'name' => 'live', 'active' => true]); // not used but ok
+    Lookup::factory()->create(['type' => 'calf-records', 'name' => 'live', 'active' => true]); // not used but ok
 
     Weight::factory()->count(3)->create([
         'animal_id' => $calf->id,
@@ -107,7 +110,7 @@ test('animal growth endpoint returns series with benchmark', function () {
 });
 
 test('calf record and wean', function () {
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Calves')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Calves')->first();
     $calf = Animal::factory()->ofCategory($category->id)->create();
 
     $res = $this->withHeaders(['Authorization' => 'Bearer '.calvesOwnerToken()])
@@ -138,7 +141,7 @@ test('calf record and wean', function () {
 });
 
 test('calves nursery returns flags', function () {
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Calves')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Calves')->first();
     Animal::factory()->count(3)->ofCategory($category->id)->create();
 
     $res = $this->withHeaders(['Authorization' => 'Bearer '.calvesOwnerToken()])

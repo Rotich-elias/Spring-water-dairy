@@ -2,13 +2,14 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Milk\Models\MilkRecord;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\MilkRecordStoreRequest;
 use App\Http\Requests\MilkRecordUpdateRequest;
 use App\Http\Resources\MilkRecordResource;
-use App\Domain\Milk\Models\MilkRecord;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 
 class MilkRecordsController extends Controller
 {
@@ -29,7 +30,7 @@ class MilkRecordsController extends Controller
         }
         if ($request->filled('from') && $request->filled('to')) {
             $query->whereDate('record_date', '>=', $request->from)
-                  ->whereDate('record_date', '<=', $request->to);
+                ->whereDate('record_date', '<=', $request->to);
         }
 
         $records = $query->orderByDesc('record_date')
@@ -64,7 +65,7 @@ class MilkRecordsController extends Controller
         }
 
         $record = MilkRecord::create(array_merge($validated, [
-            'client_uuid' => $clientUuid ?? (string) \Illuminate\Support\Str::uuid(),
+            'client_uuid' => $clientUuid ?? (string) Str::uuid(),
         ]));
 
         return response()->json(['data' => new MilkRecordResource($record->load('animal'))], 201);

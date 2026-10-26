@@ -4,11 +4,7 @@ namespace App\Domain\Milk\Services;
 
 use App\Domain\Animals\Models\Animal;
 use App\Domain\Milk\Models\MilkRecord;
-use App\Domain\Milk\Models\Lactation;
-use App\Domain\Animals\Services\AnimalLifecycleService;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
-use Carbon\Carbon;
 
 class MilkSessionService
 {
@@ -58,6 +54,7 @@ class MilkSessionService
                         'reason' => $animal ? 'male_animal' : 'animal_not_found',
                     ];
                     $skipped++;
+
                     continue;
                 }
 

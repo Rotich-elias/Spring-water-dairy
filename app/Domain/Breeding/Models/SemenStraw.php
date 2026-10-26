@@ -2,6 +2,7 @@
 
 namespace App\Domain\Breeding\Models;
 
+use Database\Factories\SemenStrawFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -26,6 +27,6 @@ class SemenStraw extends Model
 
     public static function newFactory()
     {
-        return \Database\Factories\SemenStrawFactory::new();
+        return SemenStrawFactory::new();
     }
 }

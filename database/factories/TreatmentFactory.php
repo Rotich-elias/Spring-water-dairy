@@ -2,10 +2,11 @@
 
 namespace Database\Factories;
 
-use Illuminate\Database\Eloquent\Factories\Factory;
-use App\Domain\Health\Models\Treatment;
 use App\Domain\Animals\Models\Animal;
+use App\Domain\Health\Models\Treatment;
 use App\Models\Lookup;
+use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
 
 class TreatmentFactory extends Factory
 {
@@ -18,12 +19,12 @@ class TreatmentFactory extends Factory
         $meatWithholding = fake()->numberBetween(0, 30);
 
         return [
-            'client_uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'client_uuid' => (string) Str::uuid(),
             'animal_id' => Animal::factory(),
             'treatment_date' => $treatmentDate,
             'condition_id' => Lookup::where('type', 'health-conditions')->where('active', true)->inRandomOrder()->first()?->id,
             'drug_name' => fake()->word(),
-            'dose' => fake()->numberBetween(1, 10) . 'ml',
+            'dose' => fake()->numberBetween(1, 10).'ml',
             'route' => fake()->randomElement(['IM', 'IV', 'SC', 'Oral']),
             'milk_withholding_days' => $milkWithholding,
             'meat_withholding_days' => $meatWithholding,

@@ -10,6 +10,7 @@ use App\Domain\Health\Models\Treatment;
 use App\Domain\Milk\Models\MilkRecord;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class ReportsService
 {
@@ -96,6 +97,21 @@ class ReportsService
         $from = $filters['from'] ?? Carbon::today()->startOfWeek()->toDateString();
         $to = $filters['to'] ?? Carbon::today()->endOfWeek()->toDateString();
 
+        $latestServices = BreedingService::query()
+            ->whereNull('deleted_at')
+            ->whereIn('id', BreedingService::query()
+                ->whereNull('deleted_at')
+                ->selectRaw('MAX(id)')
+                ->groupBy('animal_id'));
+
+        $notCalved = function ($query) {
+            $query->select(DB::raw(1))
+                ->from('calvings')
+                ->whereNull('calvings.deleted_at')
+                ->whereColumn('calvings.dam_id', 'services.animal_id')
+                ->whereColumn('calvings.calving_date', '>=', 'services.service_date');
+        };
+
         return [
             'heats_this_week' => Heat::query()
                 ->whereBetween('heat_date', [$from, $to])
@@ -103,15 +119,20 @@ class ReportsService
             'services_this_week' => BreedingService::query()
                 ->whereBetween('service_date', [$from, $to])
                 ->count(),
-            'pregnancies_pending' => BreedingService::query()
-                ->where('reproductive_status', 'pregnant')
-                ->where('expected_calving_date', '>=', Carbon::today())
+            'pregnancies_pending' => (clone $latestServices)
+                ->whereIn('reproductive_status', ['open', 'recheck'])
+                ->where('service_date', '<=', Carbon::today())
+                ->whereNotExists($notCalved)
                 ->count(),
-            'expected_calvings' => Calving::query()
-                ->whereBetween('calving_date', [
-                    $filters['from'] ?? Carbon::today()->toDateString(),
-                    $filters['to'] ?? Carbon::today()->addDays(30)->toDateString(),
-                ])->count(),
+            'pregnancies_confirmed' => (clone $latestServices)
+                ->where('reproductive_status', 'pregnant')
+                ->whereNotExists($notCalved)
+                ->count(),
+            'expected_calvings' => (clone $latestServices)
+                ->where('reproductive_status', 'pregnant')
+                ->whereBetween('expected_calving_date', [$from, $to])
+                ->whereNotExists($notCalved)
+                ->count(),
         ];
     }
 
@@ -142,30 +163,42 @@ class ReportsService
         $to = $filters['to'] ?? Carbon::today()->toDateString();
 
         return MilkRecord::query()
+            ->whereNull('deleted_at')
             ->whereBetween('record_date', [$from, $to])
-            ->selectRaw('record_date as date, SUM(litres) as total_litres, COUNT(*) as records')
+            ->where('excluded_from_sales', false)
+            ->selectRaw('record_date as date, SUM(litres) as total_litres, COUNT(DISTINCT animal_id) as cows, COUNT(*) as records')
             ->groupBy('record_date')
             ->orderBy('record_date')
             ->get()
-            ->toArray();
+            ->map(fn ($row) => [
+                'date' => Carbon::parse($row->date)->toDateString(),
+                'total_litres' => round((float) $row->total_litres, 2),
+                'cows' => (int) $row->cows,
+                'records' => (int) $row->records,
+            ])->toArray();
     }
 
     protected function healthTreatment(array $filters): array
     {
+        $from = $filters['from'] ?? Carbon::today()->startOfMonth()->toDateString();
+        $to = $filters['to'] ?? Carbon::today()->toDateString();
+
         return Treatment::query()
             ->with(['animal', 'condition'])
             ->whereNull('deleted_at')
-            ->where(function ($q) {
-                $q->whereNull('milk_safe_date')
-                    ->orWhere('milk_safe_date', '>=', Carbon::today());
-            })
+            ->whereBetween('treatment_date', [$from, $to])
+            ->whereHas('animal', fn ($query) => $query->whereNull('deleted_at'))
+            ->orderBy('treatment_date')
             ->get()
             ->map(fn (Treatment $t) => [
                 'id' => $t->id,
-                'animal_ear_tag' => $t->animal->ear_tag,
+                'animal_ear_tag' => $t->animal?->ear_tag,
+                'condition' => $t->condition?->name,
                 'drug_name' => $t->drug_name,
+                'treatment_date' => $t->treatment_date?->toDateString(),
                 'milk_safe_date' => $t->milk_safe_date?->toDateString(),
                 'meat_safe_date' => $t->meat_safe_date?->toDateString(),
+                'in_withholding' => $t->isInWithholding(),
             ])->toArray();
     }
 

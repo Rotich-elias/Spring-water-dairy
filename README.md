@@ -1,58 +1,87 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Spring Water Dairy — Backend
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Laravel 13 API for the Spring Water Dairy herd-management PWA.
 
-## About Laravel
+## Stack
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- PHP 8.4, Laravel 13, Sanctum token authentication.
+- Spatie Laravel Permission for roles and permissions.
+- MySQL 8 in Docker; SQLite is supported for local development and used for tests.
+- Redis for cache, sessions and queues in Docker.
+- `barryvdh/laravel-dompdf` for branded PDF reports.
+- Pest for unit and feature tests.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
-
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
-
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+## Local setup
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+composer install
+cp .env.example .env
+php artisan key:generate
+php artisan migrate --seed
+php artisan serve
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+The API is served at <http://localhost:8000/api/v1>. The seeded Owner uses
+`APP_OWNER_EMAIL` / `APP_OWNER_PASSWORD` from `.env` (defaults:
+`owner@springwaterdairy.local` / `change-me-immediately`; change it immediately).
 
-## Contributing
+For a quick SQLite setup, set:
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```dotenv
+DB_CONNECTION=sqlite
+DB_DATABASE=/absolute/path/to/backend/database/database.sqlite
+```
 
-## Code of Conduct
+The example environment uses Redis for cache and sessions. If Redis is not running
+locally, set `CACHE_STORE=file` and `SESSION_DRIVER=file` instead.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## Tests and formatting
 
-## Security Vulnerabilities
+```bash
+php artisan test --compact
+vendor/bin/pint --dirty --format agent
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Tests use an in-memory SQLite database and `APP_TIMEZONE=UTC`, so they do not need
+MySQL or Redis. `phpunit.xml` defines the test environment.
 
-## License
+## Structure
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+| Path | Purpose |
+| --- | --- |
+| `routes/api.php` | All versioned API routes under `/api/v1`. |
+| `app/Domain/` | Business domains: animals, milk, breeding, health, alerts, reports, settings. |
+| `app/Http/Controllers/Api/V1` | API controllers. |
+| `app/Http/Requests` | Form requests and validation rules. |
+| `app/Models` | Shared models such as users, settings and lookups. |
+| `database/seeders` | Roles, permissions, lookups and the initial Owner. |
+| `tests/Feature` | Endpoint, authorization and workflow coverage. |
+
+## Scheduled work
+
+`routes/console.php` generates alerts daily at 06:00 and evaluates alert rules. Run the
+scheduler with `php artisan schedule:work` locally. In Docker the `scheduler` service
+runs it, and the `queue` service processes queued jobs.
+
+## API contract
+
+`../docs/openapi.yaml` is the shared contract (OpenAPI 3.0.3). Keep it in sync with
+`routes/api.php`; CI validates the document and rejects unknown or missing operations.
+
+Errors use a consistent envelope:
+
+```json
+{
+  "error": {
+    "code": "validation_failed",
+    "message": "The given data was invalid.",
+    "fields": { "name": ["The name field is required."] }
+  }
+}
+```
+
+## Docker
+
+The backend image is nginx + PHP-FPM safe: it builds on `php:8.4-fpm`, runs migrations
+from `docker-entrypoint.sh`, and is served by the `web` nginx service. The root
+`docker-compose.yml` starts the API, frontend, MySQL, Redis, queue and scheduler.

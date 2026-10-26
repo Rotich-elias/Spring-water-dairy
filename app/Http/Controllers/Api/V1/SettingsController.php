@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Settings\Services\SettingService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\SettingsUpdateRequest;
-use App\Domain\Settings\Services\SettingService;
 
 class SettingsController extends Controller
 {

@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Breeding\Models\SemenStraw;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\SemenStrawStoreRequest;
 use App\Http\Resources\SemenStrawResource;
-use App\Domain\Breeding\Models\SemenStraw;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 

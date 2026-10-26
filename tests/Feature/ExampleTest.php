@@ -1,7 +1,7 @@
 <?php
 
-it('returns a successful response', function () {
+it('redirects the root URL to the frontend', function () {
     $response = $this->get('/');
 
-    $response->assertStatus(200);
+    $response->assertRedirect(config('app.frontend_url'));
 });

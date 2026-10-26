@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Breeding\Models\Service;
+use App\Domain\Breeding\Services\BreedingService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ServiceStoreRequest;
 use App\Http\Resources\ServiceResource;
-use App\Domain\Breeding\Models\Service;
-use App\Domain\Breeding\Services\BreedingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 

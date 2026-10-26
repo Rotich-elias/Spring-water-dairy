@@ -2,9 +2,11 @@
 
 namespace App\Domain\Milk\Models;
 
+use Database\Factories\BulkTankRecordFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 class BulkTankRecord extends Model
 {
@@ -35,13 +37,13 @@ class BulkTankRecord extends Model
     {
         static::creating(function (BulkTankRecord $record) {
             if (blank($record->client_uuid)) {
-                $record->client_uuid = (string) \Illuminate\Support\Str::uuid();
+                $record->client_uuid = (string) Str::uuid();
             }
         });
     }
 
     public static function newFactory()
     {
-        return \Database\Factories\BulkTankRecordFactory::new();
+        return BulkTankRecordFactory::new();
     }
 }

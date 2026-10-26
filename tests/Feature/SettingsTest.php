@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Setting;
+use App\Models\User;
 
 test('owner can list all settings', function () {
     $token = $this->authenticateAsOwner();
@@ -35,7 +36,7 @@ test('owner can update settings by key', function () {
 });
 
 test('non-owner cannot update settings', function () {
-    $milker = \App\Models\User::factory()->create();
+    $milker = User::factory()->create();
     $milker->assignRole('Milker');
     $token = $milker->createToken('test')->plainTextToken;
     $this->withHeader('Authorization', 'Bearer '.$token)

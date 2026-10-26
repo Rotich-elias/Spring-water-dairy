@@ -2,14 +2,15 @@
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Http\Controllers\Controller;
-use App\Http\Requests\WeightStoreRequest;
-use App\Http\Resources\WeightResource;
 use App\Domain\Animals\Models\Animal;
 use App\Domain\Calves\Models\Weight;
 use App\Domain\Calves\Services\CalfGrowthService;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\WeightStoreRequest;
+use App\Http\Resources\WeightResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 
 class WeightsController extends Controller
 {
@@ -62,7 +63,7 @@ class WeightsController extends Controller
         $previous = $animal->weights()->latest('weight_date')->first();
 
         $weight = Weight::create(array_merge($validated, [
-            'client_uuid' => $clientUuid ?? (string) \Illuminate\Support\Str::uuid(),
+            'client_uuid' => $clientUuid ?? (string) Str::uuid(),
         ]));
 
         // Compute ADG if there's a previous weight

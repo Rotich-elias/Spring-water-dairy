@@ -2,9 +2,10 @@
 
 namespace Database\Factories;
 
-use Illuminate\Database\Eloquent\Factories\Factory;
-use App\Domain\Breeding\Models\Service;
 use App\Domain\Animals\Models\Animal;
+use App\Domain\Breeding\Models\Service;
+use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
 
 class ServiceFactory extends Factory
 {
@@ -15,7 +16,7 @@ class ServiceFactory extends Factory
         $serviceDate = fake()->dateTimeBetween('-120 days', 'today')->format('Y-m-d');
 
         return [
-            'client_uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'client_uuid' => (string) Str::uuid(),
             'animal_id' => Animal::factory()->female(),
             'service_date' => $serviceDate,
             'bull_id' => null,

@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Health\Models\Vaccination;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\VaccinationStoreRequest;
 use App\Http\Resources\VaccinationResource;
-use App\Domain\Health\Models\Vaccination;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 

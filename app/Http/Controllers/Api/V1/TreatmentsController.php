@@ -2,14 +2,15 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Animals\Models\Animal;
+use App\Domain\Health\Models\Treatment;
+use App\Domain\Health\Services\TreatmentService;
+use App\Domain\Health\Services\WithholdingService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\TreatmentStoreRequest;
 use App\Http\Requests\TreatmentUpdateRequest;
 use App\Http\Resources\TreatmentResource;
 use App\Http\Resources\VaccinationResource;
-use App\Domain\Animals\Models\Animal;
-use App\Domain\Health\Models\Treatment;
-use App\Domain\Health\Services\TreatmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 
@@ -34,7 +35,7 @@ class TreatmentsController extends Controller
                 ->where('milk_safe_date', '>=', today())
                 ->orWhere(function ($q) {
                     $q->whereNotNull('meat_safe_date')
-                      ->where('meat_safe_date', '>=', today());
+                        ->where('meat_safe_date', '>=', today());
                 });
         }
 
@@ -72,7 +73,7 @@ class TreatmentsController extends Controller
         Gate::authorize('health.update', $treatment);
 
         $validated = $request->validated();
-        $withholdingService = new \App\Domain\Health\Services\WithholdingService();
+        $withholdingService = new WithholdingService;
 
         if (isset($validated['milk_withholding_days']) || isset($validated['meat_withholding_days'])) {
             $safeDates = $withholdingService->computeSafeDates(
@@ -105,7 +106,7 @@ class TreatmentsController extends Controller
     {
         Gate::authorize('health.view');
 
-        $service = new \App\Domain\Health\Services\WithholdingService();
+        $service = new WithholdingService;
         $sickBay = $service->sickBay();
 
         return response()->json(['data' => $sickBay]);

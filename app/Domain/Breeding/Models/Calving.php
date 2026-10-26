@@ -4,10 +4,12 @@ namespace App\Domain\Breeding\Models;
 
 use App\Domain\Animals\Models\Animal;
 use App\Models\Lookup;
+use Database\Factories\CalvingFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 class Calving extends Model
 {
@@ -33,7 +35,7 @@ class Calving extends Model
     {
         static::creating(function (Calving $calving) {
             if (blank($calving->client_uuid)) {
-                $calving->client_uuid = (string) \Illuminate\Support\Str::uuid();
+                $calving->client_uuid = (string) Str::uuid();
             }
         });
     }
@@ -50,6 +52,6 @@ class Calving extends Model
 
     public static function newFactory()
     {
-        return \Database\Factories\CalvingFactory::new();
+        return CalvingFactory::new();
     }
 }

@@ -24,12 +24,12 @@ class LookupService
             ])->toArray());
     }
 
-    public function byType(string $type): Collection
+    public function byType(string $type, bool $includeInactive = false): Collection
     {
         return Lookup::query()
             ->whereNull('deleted_at')
             ->ofType($type)
-            ->active()
+            ->when(! $includeInactive, fn ($query) => $query->active())
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get()

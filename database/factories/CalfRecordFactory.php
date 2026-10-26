@@ -2,9 +2,9 @@
 
 namespace Database\Factories;
 
-use Illuminate\Database\Eloquent\Factories\Factory;
-use App\Domain\Calves\Models\CalfRecord;
 use App\Domain\Animals\Models\Animal;
+use App\Domain\Calves\Models\CalfRecord;
+use Illuminate\Database\Eloquent\Factories\Factory;
 
 class CalfRecordFactory extends Factory
 {

@@ -1,33 +1,37 @@
 <?php
 
 use App\Domain\Animals\Models\Animal;
-use App\Domain\Milk\Models\MilkRecord;
 use App\Domain\Milk\Models\Lactation;
-use App\Domain\Milk\Models\BulkTankRecord;
+use App\Domain\Milk\Models\MilkRecord;
+use App\Models\Lookup;
+use App\Models\User;
 use Illuminate\Support\Str;
 
 function milkOwnerToken(): string
 {
-    $owner = \App\Models\User::where('email', 'owner@springwaterdairy.local')->first();
+    $owner = User::where('email', 'owner@springwaterdairy.local')->first();
+
     return $owner->createToken('test')->plainTextToken;
 }
 
 function milkMilkerToken(): string
 {
-    $milker = \App\Models\User::factory()->create();
+    $milker = User::factory()->create();
     $milker->assignRole('Milker');
+
     return $milker->createToken('test')->plainTextToken;
 }
 
 function milkViewerToken(): string
 {
-    $viewer = \App\Models\User::factory()->create();
+    $viewer = User::factory()->create();
     $viewer->assignRole('Viewer');
+
     return $viewer->createToken('test')->plainTextToken;
 }
 
 test('milker can view session sheet', function () {
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
     Animal::factory()->count(3)->female()->ofCategory($category->id)->create();
     $testDate = now()->toDateString();
 
@@ -40,7 +44,7 @@ test('milker can view session sheet', function () {
 });
 
 test('milker can save a milk session', function () {
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
     $cow = Animal::factory()->female()->ofCategory($category->id)->create();
     $testDate = now()->toDateString();
 
@@ -64,7 +68,7 @@ test('milker can save a milk session', function () {
 });
 
 test('session save is idempotent: same client_uuid returns original result', function () {
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
     $cow = Animal::factory()->female()->ofCategory($category->id)->create();
     $uuid = (string) Str::uuid();
     $testDate = now()->toDateString();
@@ -112,7 +116,7 @@ test('male animal is skipped in session save', function () {
 test('withholding flag is set when animal is in withholding (deferred to Phase 5 treatments)', function () {
     // The in_withholding accessor depends on the treatments table (Phase 5).
     // When treatments exist, this test verifies the flag propagates to milk records.
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
     $cow = Animal::factory()->female()->ofCategory($category->id)->create();
 
     $res = $this->withHeaders(['Authorization' => 'Bearer '.milkMilkerToken()])
@@ -129,7 +133,7 @@ test('withholding flag is set when animal is in withholding (deferred to Phase 5
 });
 
 test('individual milk record create and update', function () {
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
     $cow = Animal::factory()->female()->ofCategory($category->id)->create();
 
     $res = $this->withHeaders(['Authorization' => 'Bearer '.milkOwnerToken()])
@@ -154,7 +158,7 @@ test('individual milk record create and update', function () {
 });
 
 test('stale If-Match returns 409 conflict on milk record update', function () {
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
     $cow = Animal::factory()->female()->ofCategory($category->id)->create();
 
     $res = $this->withHeaders(['Authorization' => 'Bearer '.milkOwnerToken()])
@@ -176,7 +180,7 @@ test('stale If-Match returns 409 conflict on milk record update', function () {
 });
 
 test('viewer cannot create milk records', function () {
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
     $cow = Animal::factory()->female()->ofCategory($category->id)->create();
 
     $this->withHeaders(['Authorization' => 'Bearer '.milkViewerToken()])
@@ -214,7 +218,7 @@ test('bulk tank record create and list', function () {
 });
 
 test('lactations list and dry-off', function () {
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
     $cow = Animal::factory()->female()->ofCategory($category->id)->create();
 
     $lactation = Lactation::factory()->active()->create([
@@ -240,7 +244,7 @@ test('lactations list and dry-off', function () {
 });
 
 test('animal milk history endpoint', function () {
-    $category = \App\Models\Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
     $cow = Animal::factory()->female()->ofCategory($category->id)->create();
 
     MilkRecord::factory()->forDate(now()->subDays(2)->toDateString(), 'morning')->create([

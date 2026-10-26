@@ -2,7 +2,10 @@
 
 namespace Database\Seeders;
 
+use App\Models\User;
 use Illuminate\Database\Seeder;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 class DatabaseSeeder extends Seeder
 {
@@ -13,13 +16,13 @@ class DatabaseSeeder extends Seeder
         $this->call(BenchmarkSeeder::class);
 
         // Initial Owner account from environment variables.
-        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
-        $owner = \App\Models\User::factory()->create([
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+        $owner = User::factory()->create([
             'name' => 'Owner',
             'email' => env('APP_OWNER_EMAIL', 'owner@springwaterdairy.local'),
             'password' => bcrypt(env('APP_OWNER_PASSWORD', 'change-me-immediately')),
         ]);
-        $role = \Spatie\Permission\Models\Role::firstOrCreate(
+        $role = Role::firstOrCreate(
             ['name' => 'Owner', 'guard_name' => 'api']
         );
         $owner->assignRole($role);

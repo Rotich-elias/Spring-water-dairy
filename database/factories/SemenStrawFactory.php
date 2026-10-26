@@ -2,8 +2,8 @@
 
 namespace Database\Factories;
 
-use Illuminate\Database\Eloquent\Factories\Factory;
 use App\Domain\Breeding\Models\SemenStraw;
+use Illuminate\Database\Eloquent\Factories\Factory;
 
 class SemenStrawFactory extends Factory
 {
@@ -12,7 +12,7 @@ class SemenStrawFactory extends Factory
     public function definition(): array
     {
         return [
-            'bull_code' => 'BULL-' . fake()->unique()->numberBetween(1, 999),
+            'bull_code' => 'BULL-'.fake()->unique()->numberBetween(1, 999),
             'bull_name' => fake()->company(),
             'breed' => fake()->randomElement(['Friesian', 'Jersey', 'Ayrshire']),
             'quantity' => fake()->numberBetween(1, 100),

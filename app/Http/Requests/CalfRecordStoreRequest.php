@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests;
 
-use App\Domain\Animals\Models\Animal;
 use Illuminate\Foundation\Http\FormRequest;
 
 class CalfRecordStoreRequest extends FormRequest

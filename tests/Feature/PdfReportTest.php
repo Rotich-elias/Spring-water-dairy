@@ -1,57 +1,56 @@
 <?php
 
+use App\Domain\Reports\Services\PdfReportService;
 use App\Models\User;
 
-test('owner can prepare a PDF report with farm branding', function () {
+test('owner can download an animal register PDF', function () {
     $token = $this->authenticateAsOwner();
 
     $res = $this->withHeader('Authorization', 'Bearer '.$token)
-        ->getJson('/api/v1/reports/animal-register/pdf');
+        ->get('/api/v1/reports/animal-register/pdf');
 
-    $res->assertStatus(200);
-    $data = $res->json('data');
-    expect($data)->toHaveKey('branding');
-    expect($data)->toHaveKey('report_type');
-    expect($data)->toHaveKey('generated_at');
-    expect($data)->toHaveKey('data');
-    expect($data['report_type'])->toBe('animal-register');
-    expect($data['branding'])->toHaveKey('farm_name');
-    expect($data['branding']['farm_name'])->toBe('Spring Water Dairy');
-    expect($data['branding'])->toHaveKey('farm_address');
-    expect($data['branding'])->toHaveKey('farm_contact_phone');
-    expect($data['branding'])->toHaveKey('farm_contact_email');
-    expect($data['branding'])->toHaveKey('farm_logo_path');
+    $res->assertOk();
+    expect($res->headers->get('content-type'))->toContain('application/pdf');
+    expect($res->headers->get('content-disposition'))->toContain('attachment');
+    expect($res->getContent())->toStartWith('%PDF-');
 });
 
-test('owner can prepare a milk production PDF report with filters', function () {
+test('owner can download a filtered milk production PDF', function () {
     $token = $this->authenticateAsOwner();
 
     $res = $this->withHeader('Authorization', 'Bearer '.$token)
-        ->getJson('/api/v1/reports/milk-production/pdf', [
-            'from' => '2026-10-01',
-            'to' => '2026-10-18',
-        ]);
+        ->get('/api/v1/reports/milk-production/pdf?from=2026-10-01&to=2026-10-18');
 
-    $res->assertStatus(200);
-    $data = $res->json('data');
-    expect($data['report_type'])->toBe('milk-production');
-    expect($data)->toHaveKey('branding');
-    expect($data)->toHaveKey('data');
+    $res->assertOk();
+    expect($res->headers->get('content-type'))->toContain('application/pdf');
+    expect($res->getContent())->toStartWith('%PDF-');
 });
 
-test('owner can prepare a mortality PDF report', function () {
+test('owner can download a mortality PDF', function () {
     $token = $this->authenticateAsOwner();
 
     $res = $this->withHeader('Authorization', 'Bearer '.$token)
-        ->getJson('/api/v1/reports/mortality/pdf', [
-            'from' => '2026-10-01',
-            'to' => '2026-10-18',
-        ]);
+        ->get('/api/v1/reports/mortality/pdf?from=2026-10-01&to=2026-10-18');
 
-    $res->assertStatus(200);
-    $data = $res->json('data');
-    expect($data['report_type'])->toBe('mortality');
-    expect($data)->toHaveKey('branding');
+    $res->assertOk();
+    expect($res->headers->get('content-type'))->toContain('application/pdf');
+    expect($res->getContent())->toStartWith('%PDF-');
+});
+
+test('pdf report data includes farm branding', function () {
+    $report = app(PdfReportService::class)->prepare('animal-register');
+
+    expect($report)->toHaveKey('branding');
+    expect($report)->toHaveKey('report_type');
+    expect($report)->toHaveKey('generated_at');
+    expect($report)->toHaveKey('data');
+    expect($report['report_type'])->toBe('animal-register');
+    expect($report['branding'])->toHaveKey('farm_name');
+    expect($report['branding']['farm_name'])->toBe('Spring Water Dairy');
+    expect($report['branding'])->toHaveKey('farm_address');
+    expect($report['branding'])->toHaveKey('farm_contact_phone');
+    expect($report['branding'])->toHaveKey('farm_contact_email');
+    expect($report['branding'])->toHaveKey('farm_logo_path');
 });
 
 test('non-reports user cannot generate PDF reports', function () {

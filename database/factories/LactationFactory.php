@@ -2,12 +2,12 @@
 
 namespace Database\Factories;
 
-use Illuminate\Database\Eloquent\Factories\Factory;
-use App\Domain\Milk\Models\Lactation;
 use App\Domain\Animals\Models\Animal;
+use App\Domain\Milk\Models\Lactation;
+use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Domain\Milk\Models\Lactation>
+ * @extends Factory<Lactation>
  */
 class LactationFactory extends Factory
 {

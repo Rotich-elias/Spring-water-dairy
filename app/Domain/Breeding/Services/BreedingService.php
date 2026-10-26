@@ -3,14 +3,15 @@
 namespace App\Domain\Breeding\Services;
 
 use App\Domain\Animals\Models\Animal;
-use App\Domain\Breeding\Models\Service;
+use App\Domain\Breeding\Models\Calving;
 use App\Domain\Breeding\Models\Heat;
 use App\Domain\Breeding\Models\PregnancyCheck;
-use App\Domain\Breeding\Models\Calving;
+use App\Domain\Breeding\Models\Service;
+use App\Models\Lookup;
 use App\Models\Setting;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
-use Carbon\Carbon;
 
 class BreedingService
 {
@@ -86,7 +87,7 @@ class BreedingService
                 $daysSinceCalving = Carbon::parse($lastCalving->calving_date)->diffInDays($data['service_date'], false);
                 if ($daysSinceCalving < $vwpDays && ! filter_var($data['override'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
                     throw ValidationException::withMessages([
-                        'service_date' => ["service_too_early" => "Voluntary waiting period of {$vwpDays} days not yet met. Override required."],
+                        'service_date' => ['service_too_early' => "Voluntary waiting period of {$vwpDays} days not yet met. Override required."],
                     ]);
                 }
             }
@@ -139,7 +140,7 @@ class BreedingService
 
     protected function statusIdFor(string $name): ?int
     {
-        return \App\Models\Lookup::where('type', 'animal-statuses')->where('name', $name)->whereNull('deleted_at')->value('id');
+        return Lookup::where('type', 'animal-statuses')->where('name', $name)->whereNull('deleted_at')->value('id');
     }
 
     /**
@@ -161,7 +162,7 @@ class BreedingService
                 'recheck' => 'In Heat',
             ];
             $statusName = $statusMap[$data['result']] ?? 'Active';
-            $statusId = \App\Models\Lookup::where('type', 'animal-statuses')
+            $statusId = Lookup::where('type', 'animal-statuses')
                 ->where('name', $statusName)
                 ->whereNull('deleted_at')
                 ->value('id');

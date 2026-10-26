@@ -5,8 +5,8 @@ namespace App\Domain\Milk\Services;
 use App\Domain\Animals\Models\Animal;
 use App\Domain\Milk\Models\Lactation;
 use App\Domain\Milk\Models\MilkRecord;
-use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class LactationService
 {

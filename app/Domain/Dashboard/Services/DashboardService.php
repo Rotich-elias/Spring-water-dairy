@@ -6,9 +6,11 @@ use App\Domain\Animals\Models\Animal;
 use App\Domain\Breeding\Models\Heat;
 use App\Domain\Breeding\Models\Service;
 use App\Domain\Calves\Services\CalfGrowthService;
+use App\Domain\Health\Models\Vaccination;
 use App\Domain\Health\Services\WithholdingService;
 use App\Domain\Milk\Models\MilkRecord;
 use App\Models\Lookup;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
 class DashboardService
@@ -24,134 +26,76 @@ class DashboardService
     public function summary(): array
     {
         $today = today()->toDateString();
+        $weekAgo = today()->subDays(7)->toDateString();
 
         $totalHerd = Animal::query()->whereNull('exit_date')->whereNull('deleted_at')->count();
 
-        $milking = Animal::query()
-            ->where('sex', 'F')
-            ->whereNull('exit_date')
-            ->whereNull('deleted_at')
-            ->whereIn('status_id', [$this->statusIdFor('Milking Cows')])
-            ->count();
-
-        $dry = Animal::query()
-            ->where('sex', 'F')
-            ->whereNull('exit_date')
-            ->whereNull('deleted_at')
-            ->whereIn('status_id', [$this->statusIdFor('Dry Cows')])
-            ->count();
-
-        $heifers = Animal::query()
-            ->where('sex', 'F')
-            ->whereNull('exit_date')
-            ->whereNull('deleted_at')
-            ->whereIn('status_id', [$this->statusIdFor('Heifers')])
-            ->count();
-
-        $calves = Animal::query()
-            ->where('sex', 'F')
-            ->whereNull('exit_date')
-            ->whereNull('deleted_at')
-            ->whereIn('category_id', [$this->categoryIdFor('Calves')])
-            ->count();
-
-        // Latest milk date & total
-        $latestMilk = MilkRecord::query()
-            ->orderByDesc('record_date')
-            ->first();
-
-        $latestMilkDate = $latestMilk?->record_date;
-        $latestMilkLitres = 0.0;
-        $avgYield = 0.0;
-        $todaysMilkLitres = 0.0;
-
-        if ($latestMilkDate) {
-            $latestMilkLitres = MilkRecord::query()
-                ->where('record_date', $latestMilkDate)
-                ->where('session', 'morning')
-                ->where('excluded_from_sales', false)
-                ->sum('litres');
-
-            $eveningLitres = MilkRecord::query()
-                ->where('record_date', $latestMilkDate)
-                ->where('session', 'evening')
-                ->where('excluded_from_sales', false)
-                ->sum('litres');
-
-            $latestMilkLitres += $eveningLitres;
-
-            $cowCount = MilkRecord::query()
-                ->where('record_date', $latestMilkDate)
-                ->where('excluded_from_sales', false)
-                ->distinct('animal_id')
-                ->count('animal_id');
-
-            $avgYield = $cowCount > 0 ? $latestMilkLitres / $cowCount : 0.0;
-
-            // Today's milk
-            $todaysMilkLitres = MilkRecord::query()
-                ->where('record_date', $today)
-                ->where('excluded_from_sales', false)
-                ->sum('litres');
+        $animalsByCategory = [];
+        foreach (['Milking Cows', 'Dry Cows', 'Heifers', 'Calves', 'Bulls'] as $category) {
+            $animalsByCategory[$category] = $this->activeCategoryCount($category);
         }
 
-        // Confirmed in calf: animals with pregnant reproductive_status from latest service
-        $confirmedInCalf = Service::query()
-            ->where('reproductive_status', 'pregnant')
-            ->where('service_date', '<=', today())
-            ->distinct('animal_id')
-            ->count('animal_id');
+        $statusCounts = Animal::query()
+            ->whereNull('exit_date')
+            ->whereNull('deleted_at')
+            ->whereNotNull('status_id')
+            ->select('status_id', DB::raw('count(*) as total'))
+            ->groupBy('status_id')
+            ->pluck('total', 'status_id');
 
-        // Calf ADG
-        $calfAdg = $this->calfGrowth->overallAdgAggregate() ?? 0.0;
+        $animalsByStatus = Lookup::query()
+            ->where('type', 'animal-statuses')
+            ->whereNull('deleted_at')
+            ->orderBy('sort_order')
+            ->get()
+            ->mapWithKeys(fn (Lookup $status) => [$status->name => (int) ($statusCounts[$status->id] ?? 0)])
+            ->all();
 
-        // Sick bay count
-        $sickBay = count($this->withholding->sickBay());
+        $milking = $animalsByCategory['Milking Cows'];
+        $todaysMilkLitres = MilkRecord::query()
+            ->where('record_date', $today)
+            ->where('excluded_from_sales', false)
+            ->sum('litres');
 
-        // Heats this week
         $heatsThisWeek = Heat::query()
-            ->whereBetween('heat_date', [today()->subDays(7)->toDateString(), today()])
+            ->whereBetween('heat_date', [$weekAgo, $today])
             ->count();
 
-        // Services this week
         $servicesThisWeek = Service::query()
-            ->whereBetween('service_date', [today()->subDays(7)->toDateString(), today()])
+            ->whereBetween('service_date', [$weekAgo, $today])
             ->count();
 
-        // Pending PDs
-        $pregnanciesPending = Service::query()
-            ->where('reproductive_status', 'open')
-            ->where('service_date', '<=', today())
+        $pregnanciesPending = $this->latestServices()
+            ->whereIn('reproductive_status', ['open', 'recheck'])
+            ->where('service_date', '<=', $today)
+            ->whereNotExists($this->calvedSinceService())
             ->count();
 
-        // Calvings due this week
-        $calvingsDueThisWeek = Service::query()
-            ->where('reproductive_status', '!=', 'open')
-            ->whereBetween('expected_calving_date', [today()->toDateString(), today()->addDays(7)->toDateString()])
+        $calvingsDueThisWeek = $this->latestServices()
+            ->where('reproductive_status', 'pregnant')
+            ->whereBetween('expected_calving_date', [$today, today()->addDays(7)->toDateString()])
+            ->whereNotExists($this->calvedSinceService())
+            ->count();
+
+        $vaccinesDue = Vaccination::query()
+            ->whereNull('deleted_at')
+            ->whereNotNull('next_due_date')
+            ->where('next_due_date', '<=', today()->addDays(7)->toDateString())
+            ->whereHas('animal', fn (Builder $query) => $query->whereNull('exit_date')->whereNull('deleted_at'))
             ->count();
 
         return [
             'total_animals' => $totalHerd,
-            'animals_by_status' => [
-                'Milking Cows' => $milking,
-                'Dry Cows' => $dry,
-                'Heifers' => $heifers,
-                'Calves' => $calves,
-            ],
-            'animals_by_category' => [
-                'Milking Cows' => $milking,
-                'Dry Cows' => $dry,
-                'Heifers' => $heifers,
-                'Calves' => $calves,
-            ],
+            'animals_by_status' => $animalsByStatus,
+            'animals_by_category' => $animalsByCategory,
             'lactating_cows' => $milking,
-            'todays_milk_litres' => round($todaysMilkLitres, 2),
+            'todays_milk_litres' => round((float) $todaysMilkLitres, 2),
             'heats_this_week' => $heatsThisWeek,
             'services_this_week' => $servicesThisWeek,
             'pregnancies_pending' => $pregnanciesPending,
             'calvings_expected_this_week' => $calvingsDueThisWeek,
-            'treatments_in_withholding' => $sickBay,
-            'vaccines_due' => 0,
+            'treatments_in_withholding' => count($this->withholding->sickBay()),
+            'vaccines_due' => $vaccinesDue,
         ];
     }
 
@@ -163,19 +107,15 @@ class DashboardService
         $totalHerd = Animal::query()->whereNull('exit_date')->whereNull('deleted_at')->count();
 
         $categories = [
-            ['name' => 'Milking Cows', 'target' => 70, 'status_id' => $this->statusIdFor('Milking Cows')],
-            ['name' => 'Dry Cows', 'target' => 20, 'status_id' => $this->statusIdFor('Dry Cows')],
-            ['name' => 'Heifers', 'target' => 50, 'status_id' => $this->statusIdFor('Heifers')],
-            ['name' => 'Calves', 'target' => 40, 'status_id' => $this->statusIdFor('Calves')],
+            ['name' => 'Milking Cows', 'target' => 70],
+            ['name' => 'Dry Cows', 'target' => 20],
+            ['name' => 'Heifers', 'target' => 50],
+            ['name' => 'Calves', 'target' => 40],
         ];
 
         $composition = [];
         foreach ($categories as $c) {
-            $count = Animal::query()
-                ->where('category_id', $c['status_id'])
-                ->whereNull('exit_date')
-                ->whereNull('deleted_at')
-                ->count();
+            $count = $this->activeCategoryCount($c['name']);
 
             $percent = $totalHerd > 0 ? round(($count / $totalHerd) * 100, 1) : 0.0;
             $diff = $c['target'] - $count;
@@ -287,9 +227,10 @@ class DashboardService
         $events = [];
 
         // PD due: services in PD window
-        $pdServices = Service::query()
+        $pdServices = $this->latestServices()
             ->where('reproductive_status', '!=', 'open')
             ->whereBetween('pd_window_end', [$today->toDateString(), $end->toDateString()])
+            ->whereNotExists($this->calvedSinceService())
             ->with('animal')
             ->get();
 
@@ -305,9 +246,10 @@ class DashboardService
         }
 
         // Dry-off due: target_dry_date in range
-        $dryServices = Service::query()
+        $dryServices = $this->latestServices()
             ->where('reproductive_status', '!=', 'open')
             ->whereBetween('target_dry_date', [$today->toDateString(), $end->toDateString()])
+            ->whereNotExists($this->calvedSinceService())
             ->with('animal')
             ->get();
 
@@ -323,9 +265,10 @@ class DashboardService
         }
 
         // Calving due: expected_calving_date in range
-        $calvingServices = Service::query()
-            ->where('reproductive_status', '!=', 'open')
+        $calvingServices = $this->latestServices()
+            ->where('reproductive_status', 'pregnant')
             ->whereBetween('expected_calving_date', [$today->toDateString(), $end->toDateString()])
+            ->whereNotExists($this->calvedSinceService())
             ->with('animal')
             ->get();
 
@@ -378,24 +321,59 @@ class DashboardService
     }
 
     /**
+     * Count active animals in a category, treating a missing lookup as zero.
+     */
+    private function activeCategoryCount(string $name): int
+    {
+        $categoryId = $this->categoryIdFor($name);
+
+        if (! $categoryId) {
+            return 0;
+        }
+
+        return Animal::query()
+            ->where('category_id', $categoryId)
+            ->whereNull('exit_date')
+            ->whereNull('deleted_at')
+            ->count();
+    }
+
+    /**
+     * Restrict a service query to the most recent service per animal.
+     */
+    private function latestServices(): Builder
+    {
+        $latestIds = Service::query()
+            ->whereNull('deleted_at')
+            ->selectRaw('MAX(id)')
+            ->groupBy('animal_id');
+
+        return Service::query()
+            ->whereNull('deleted_at')
+            ->whereIn('id', $latestIds);
+    }
+
+    /**
+     * Exclude services that already resulted in a calving.
+     */
+    private function calvedSinceService(): \Closure
+    {
+        return function ($query) {
+            $query->select(DB::raw(1))
+                ->from('calvings')
+                ->whereNull('calvings.deleted_at')
+                ->whereColumn('calvings.dam_id', 'services.animal_id')
+                ->whereColumn('calvings.calving_date', '>=', 'services.service_date');
+        };
+    }
+
+    /**
      * Helper: get lookups ID for category name.
      */
     private function categoryIdFor(string $name): ?int
     {
         return Lookup::query()
             ->where('type', 'categories')
-            ->where('name', $name)
-            ->whereNull('deleted_at')
-            ->value('id');
-    }
-
-    /**
-     * Helper: get lookups ID for status name.
-     */
-    private function statusIdFor(string $name): ?int
-    {
-        return Lookup::query()
-            ->where('type', 'animal-statuses')
             ->where('name', $name)
             ->whereNull('deleted_at')
             ->value('id');

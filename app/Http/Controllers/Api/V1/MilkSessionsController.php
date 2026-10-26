@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Milk\Services\MilkSessionService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\MilkSessionStoreRequest;
-use App\Domain\Milk\Services\MilkSessionService;
 use Illuminate\Http\Request;
 
 class MilkSessionsController extends Controller

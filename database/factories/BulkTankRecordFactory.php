@@ -2,11 +2,12 @@
 
 namespace Database\Factories;
 
-use Illuminate\Database\Eloquent\Factories\Factory;
 use App\Domain\Milk\Models\BulkTankRecord;
+use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Domain\Milk\Models\BulkTankRecord>
+ * @extends Factory<BulkTankRecord>
  */
 class BulkTankRecordFactory extends Factory
 {
@@ -15,7 +16,7 @@ class BulkTankRecordFactory extends Factory
     public function definition(): array
     {
         return [
-            'client_uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'client_uuid' => (string) Str::uuid(),
             'record_date' => fake()->dateTimeBetween('-30 days', 'today')->format('Y-m-d'),
             'session' => fake()->randomElement(['morning', 'evening']),
             'litres_collected' => fake()->randomFloat(2, 200, 800),

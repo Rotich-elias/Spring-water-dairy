@@ -2,6 +2,7 @@
 
 use App\Domain\Animals\Models\Animal;
 use App\Models\Lookup;
+use App\Models\User;
 use Illuminate\Support\Str;
 
 function authHeader(string $token): array
@@ -11,14 +12,16 @@ function authHeader(string $token): array
 
 function ownerToken(): string
 {
-    $owner = \App\Models\User::where('email', 'owner@springwaterdairy.local')->first();
+    $owner = User::where('email', 'owner@springwaterdairy.local')->first();
+
     return $owner->createToken('test')->plainTextToken;
 }
 
 function milkerToken(): string
 {
-    $milker = \App\Models\User::factory()->create();
+    $milker = User::factory()->create();
     $milker->assignRole('Milker');
+
     return $milker->createToken('test')->plainTextToken;
 }
 
@@ -173,7 +176,7 @@ test('milker cannot update another milker animal today-only rule enforced by bac
     // Policy-level: Milker has animals.update permission via role; backend enforces
     // "edit only entries created today by themselves" for milk entries, not animals.
     // Here we just confirm role-based 403 for roles without the permission.
-    $viewer = \App\Models\User::factory()->create();
+    $viewer = User::factory()->create();
     $viewer->assignRole('Viewer');
     $token = $viewer->createToken('test')->plainTextToken;
 

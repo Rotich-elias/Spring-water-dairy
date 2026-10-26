@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
 use App\Models\Lookup;
+use Illuminate\Database\Seeder;
 
 class LookupSeeder extends Seeder
 {

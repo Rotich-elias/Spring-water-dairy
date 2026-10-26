@@ -2,9 +2,10 @@
 
 namespace Database\Factories;
 
-use Illuminate\Database\Eloquent\Factories\Factory;
-use App\Domain\Breeding\Models\Heat;
 use App\Domain\Animals\Models\Animal;
+use App\Domain\Breeding\Models\Heat;
+use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
 
 class HeatFactory extends Factory
 {
@@ -13,7 +14,7 @@ class HeatFactory extends Factory
     public function definition(): array
     {
         return [
-            'client_uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'client_uuid' => (string) Str::uuid(),
             'animal_id' => Animal::factory()->female(),
             'heat_date' => fake()->dateTimeBetween('-60 days', 'today')->format('Y-m-d'),
             'observed_by' => fake()->name(),

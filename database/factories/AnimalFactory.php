@@ -2,12 +2,13 @@
 
 namespace Database\Factories;
 
-use Illuminate\Database\Eloquent\Factories\Factory;
 use App\Domain\Animals\Models\Animal;
 use App\Models\Lookup;
+use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Domain\Animals\Models\Animal>
+ * @extends Factory<Animal>
  */
 class AnimalFactory extends Factory
 {
@@ -21,7 +22,7 @@ class AnimalFactory extends Factory
         $breed = Lookup::where('type', 'breeds')->where('active', true)->inRandomOrder()->first()?->id;
 
         return [
-            'client_uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'client_uuid' => (string) Str::uuid(),
             'ear_tag' => 'COW-'.fake()->unique()->numberBetween(1, 99999),
             'name' => fake()->optional()->firstName(),
             'category_id' => $category,

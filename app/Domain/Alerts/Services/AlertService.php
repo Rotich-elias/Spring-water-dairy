@@ -45,8 +45,8 @@ class AlertService
                 Notification::create([
                     'user_id' => $user->id,
                     'type' => 'health',
-                    'title' => 'Withholding Ending',
-                    'message' => "Animal {$animal['ear_tag']} withholding ends soon.",
+                    'title' => 'Animal in Withholding',
+                    'message' => "Animal {$animal['ear_tag']} is in milk or meat withholding.",
                     'data' => ['animal_id' => $animal['id'], 'event_key' => $key],
                 ]);
                 $created[] = $animal['id'];
@@ -242,12 +242,18 @@ class AlertService
     {
         $cutoffDate = today()->subDays(80)->toDateString();
 
+        $milkingCategoryId = $this->categoryIdFor('Milking Cows');
+
+        if (! $milkingCategoryId) {
+            return [];
+        }
+
         $cows = Animal::query()
             ->where('sex', 'F')
+            ->where('category_id', $milkingCategoryId)
             ->whereNull('exit_date')
             ->whereNull('deleted_at')
-            ->whereIn('status_id', $this->statusIds('Milking Cows'))
-            ->where('calvings.count', '>=', 1) // has calved before
+            ->whereHas('calvings')
             ->whereDoesntHave('services', function ($q) {
                 $q->where('service_date', '>=', today()->subDays(80)->toDateString());
             })
@@ -299,12 +305,13 @@ class AlertService
             ->where('sex', 'F')
             ->whereNull('exit_date')
             ->whereNull('deleted_at')
-            ->with(['treatments' => function ($q) {
+            ->whereHas('treatments', function ($q) use ($today, $end) {
                 $q->whereNull('deleted_at')
-                    ->whereNotNull('milk_safe_date')
-                    ->where('milk_safe_date', '>=', today())
-                    ->where('milk_safe_date', '<=', today()->addDays(3)->toDateString());
-            }])
+                    ->where(function ($query) use ($today, $end) {
+                        $query->whereBetween('milk_safe_date', [$today->toDateString(), $end->toDateString()])
+                            ->orWhereBetween('meat_safe_date', [$today->toDateString(), $end->toDateString()]);
+                    });
+            })
             ->get();
 
         $created = [];
@@ -451,7 +458,7 @@ class AlertService
      */
     protected function resolveRecipients(AlertRule $rule): array
     {
-        $roles = $rule->roles ?? ['Owner', 'Manager'];
+        $roles = $rule->recipients ?: ['Owner', 'Manager'];
 
         return $this->resolveRecipientsByRole($roles);
     }
@@ -490,18 +497,5 @@ class AlertService
             ->where('name', $name)
             ->whereNull('deleted_at')
             ->value('id');
-    }
-
-    /**
-     * Helper: get status IDs for a status name.
-     */
-    protected function statusIds(string $name): array
-    {
-        return Lookup::query()
-            ->where('type', 'animal-statuses')
-            ->where('name', $name)
-            ->whereNull('deleted_at')
-            ->pluck('id')
-            ->all();
     }
 }

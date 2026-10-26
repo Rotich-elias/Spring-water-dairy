@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Domain\Alerts\Models\Notification;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -48,5 +50,10 @@ class User extends Authenticatable
     public function auditLogs()
     {
         return $this->hasMany(AuditLog::class, 'user_id');
+    }
+
+    public function appNotifications(): HasMany
+    {
+        return $this->hasMany(Notification::class);
     }
 }

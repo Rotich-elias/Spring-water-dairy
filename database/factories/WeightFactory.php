@@ -2,9 +2,10 @@
 
 namespace Database\Factories;
 
-use Illuminate\Database\Eloquent\Factories\Factory;
-use App\Domain\Calves\Models\Weight;
 use App\Domain\Animals\Models\Animal;
+use App\Domain\Calves\Models\Weight;
+use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
 
 class WeightFactory extends Factory
 {
@@ -13,7 +14,7 @@ class WeightFactory extends Factory
     public function definition(): array
     {
         return [
-            'client_uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'client_uuid' => (string) Str::uuid(),
             'animal_id' => Animal::factory(),
             'weight_date' => fake()->dateTimeBetween('-60 days', 'today')->format('Y-m-d'),
             'weight_kg' => fake()->randomFloat(2, 20, 500),

@@ -14,9 +14,9 @@ class NotificationsController extends Controller
     {
         Gate::authorize('notifications.view');
 
-        $query = Notification::query()->with('user');
+        $query = $request->user()->appNotifications()->with('user');
 
-        if ($request->filled('unread_only') && $request->boolean('unread_only')) {
+        if ($request->boolean('unread_only')) {
             $query->whereNull('read_at');
         }
 
@@ -31,14 +31,17 @@ class NotificationsController extends Controller
                 'per_page' => $notifications->perPage(),
                 'total' => $notifications->total(),
                 'last_page' => $notifications->lastPage(),
-                'unread_count' => Notification::query()->whereNull('read_at')->count(),
+                'unread_count' => $request->user()->appNotifications()->whereNull('read_at')->count(),
             ],
         ]);
     }
 
     public function markRead(Request $request, Notification $notification)
     {
-        Gate::authorize('health.view', $notification);
+        Gate::authorize('notifications.view');
+
+        $canManageOthers = $request->user()->can('notifications.update');
+        abort_unless($notification->user_id === $request->user()->id || $canManageOthers, 403);
 
         $notification->update(['read_at' => now()]);
 
@@ -51,8 +54,7 @@ class NotificationsController extends Controller
     {
         Gate::authorize('notifications.view');
 
-        $query = auth()->user()->notifications()->whereNull('read_at');
-        $query->update(['read_at' => now()]);
+        $request->user()->appNotifications()->whereNull('read_at')->update(['read_at' => now()]);
 
         return response()->json([
             'data' => ['read_all' => true],

@@ -4,10 +4,12 @@ namespace App\Domain\Health\Models;
 
 use App\Domain\Animals\Models\Animal;
 use App\Models\Lookup;
+use Database\Factories\VaccinationFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 class Vaccination extends Model
 {
@@ -36,7 +38,7 @@ class Vaccination extends Model
     {
         static::creating(function (Vaccination $vaccination) {
             if (blank($vaccination->client_uuid)) {
-                $vaccination->client_uuid = (string) \Illuminate\Support\Str::uuid();
+                $vaccination->client_uuid = (string) Str::uuid();
             }
         });
     }
@@ -58,6 +60,6 @@ class Vaccination extends Model
 
     public static function newFactory()
     {
-        return \Database\Factories\VaccinationFactory::new();
+        return VaccinationFactory::new();
     }
 }

@@ -2,16 +2,17 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Animals\Models\Animal;
+use App\Domain\Calves\Models\CalfRecord;
+use App\Domain\Calves\Services\CalfGrowthService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CalfRecordStoreRequest;
 use App\Http\Requests\CalfWeanRequest;
 use App\Http\Resources\CalfRecordResource;
-use App\Domain\Animals\Models\Animal;
-use App\Domain\Calves\Models\CalfRecord;
-use App\Domain\Calves\Services\CalfGrowthService;
+use App\Models\Lookup;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class CalfRecordsController extends Controller
 {
@@ -147,6 +148,6 @@ class CalfRecordsController extends Controller
 
     protected function categoryIdFor(string $name): ?int
     {
-        return \App\Models\Lookup::where('type', 'categories')->where('name', $name)->whereNull('deleted_at')->value('id');
+        return Lookup::where('type', 'categories')->where('name', $name)->whereNull('deleted_at')->value('id');
     }
 }

@@ -2,10 +2,11 @@
 
 namespace Database\Factories;
 
-use Illuminate\Database\Eloquent\Factories\Factory;
-use App\Domain\Breeding\Models\Calving;
 use App\Domain\Animals\Models\Animal;
+use App\Domain\Breeding\Models\Calving;
 use App\Models\Lookup;
+use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
 
 class CalvingFactory extends Factory
 {
@@ -14,7 +15,7 @@ class CalvingFactory extends Factory
     public function definition(): array
     {
         return [
-            'client_uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'client_uuid' => (string) Str::uuid(),
             'dam_id' => Animal::factory()->female(),
             'calving_date' => fake()->dateTimeBetween('-60 days', 'today'),
             'ease_score_id' => Lookup::where('type', 'calving-ease-scores')->where('active', true)->inRandomOrder()->first()?->id,
