@@ -53,7 +53,7 @@ class DashboardService
 
         $milking = $animalsByCategory['Milking Cows'];
         $todaysMilkLitres = MilkRecord::query()
-            ->where('record_date', $today)
+            ->whereDate('record_date', $today)
             ->where('excluded_from_sales', false)
             ->sum('litres');
 

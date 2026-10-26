@@ -210,6 +210,23 @@ test('calving creates calves, lactation, and dam updates atomically', function (
     expect(Animal::where('ear_tag', 'TEST-CALF-B')->count())->toBe(1);
 });
 
+test('calving recorded today with a time is accepted', function () {
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $dam = Animal::factory()->female()->ofCategory($category->id)->create();
+
+    $res = $this->withHeaders(['Authorization' => 'Bearer '.breedingOwnerToken()])
+        ->postJson('/api/v1/breeding/calvings', [
+            'client_uuid' => (string) Str::uuid(),
+            'dam_id' => $dam->id,
+            'calving_date' => now()->format('Y-m-d H:i:s'),
+            'calves' => [
+                ['ear_tag' => 'TODAY-CALF', 'sex' => 'F', 'outcome' => 'live'],
+            ],
+        ]);
+
+    $res->assertCreated();
+});
+
 test('duplicate calf ear tag is rejected', function () {
     $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
     $dam = Animal::factory()->female()->ofCategory($category->id)->create();

@@ -22,6 +22,7 @@ class BenchmarkSeeder extends Seeder
             'pd_window_end_days' => ['60', 'integer', 'breeding', true],
             'milk_withholding_default_days' => ['4', 'integer', 'health', true],
             'meat_withholding_default_days' => ['14', 'integer', 'health', true],
+            'milk_sessions_per_day' => ['2', 'integer', 'milk', true],
             'dashboard_cache_ttl_minutes' => ['15', 'integer', 'dashboard', true],
             'farm_address' => ['Nairobi, Kenya', 'string', 'branding', true],
             'farm_contact_phone' => ['+254 700 000 000', 'string', 'branding', true],

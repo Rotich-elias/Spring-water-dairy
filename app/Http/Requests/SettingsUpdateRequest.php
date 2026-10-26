@@ -16,6 +16,7 @@ class SettingsUpdateRequest extends FormRequest
         return [
             'settings' => ['required', 'array'],
             'settings.*' => ['nullable'],
+            'settings.milk_sessions_per_day' => ['nullable', 'integer', 'between:1,3'],
         ];
     }
 }

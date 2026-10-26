@@ -16,7 +16,7 @@ class MilkSessionStoreRequest extends FormRequest
         return [
             'client_uuid' => ['required', 'string', 'uuid'],
             'record_date' => ['required', 'date', 'before_or_equal:today'],
-            'session' => ['required', 'in:morning,evening'],
+            'session' => ['required', 'in:morning,midday,evening'],
             'entries' => ['required', 'array', 'min:1'],
             'entries.*.animal_id' => ['required', 'integer', 'exists:animals,id'],
             'entries.*.litres' => ['required', 'numeric', 'min:0', 'max:100'],

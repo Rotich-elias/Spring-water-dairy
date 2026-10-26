@@ -9,9 +9,32 @@ class SettingService
 {
     public function all(): Collection
     {
-        return Setting::query()
-            ->whereNull('deleted_at')
-            ->get()
+        return $this->map(
+            Setting::query()->whereNull('deleted_at')->get()
+        );
+    }
+
+    /**
+     * Settings safe to expose to every signed-in user (used by operational
+     * screens such as the milk session sheet).
+     */
+    public function public(): Collection
+    {
+        return $this->map(
+            Setting::query()
+                ->whereNull('deleted_at')
+                ->where('is_public', true)
+                ->get()
+        );
+    }
+
+    /**
+     * @param  Collection<int, Setting>  $settings
+     * @return Collection<string, mixed>
+     */
+    private function map(Collection $settings): Collection
+    {
+        return $settings
             ->mapWithKeys(fn (Setting $setting) => [$setting->key => $setting->value])
             ->sortKeys();
     }

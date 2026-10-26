@@ -17,7 +17,7 @@ class MilkRecordStoreRequest extends FormRequest
             'client_uuid' => ['sometimes', 'string', 'uuid'],
             'animal_id' => ['required', 'integer', 'exists:animals,id'],
             'record_date' => ['required', 'date', 'before_or_equal:today'],
-            'session' => ['required', 'in:morning,evening'],
+            'session' => ['required', 'in:morning,midday,evening'],
             'litres' => ['required', 'numeric', 'min:0', 'max:100'],
             'cmt_score' => ['nullable', 'integer', 'min:0', 'max:5'],
             'scc' => ['nullable', 'integer', 'min:0'],

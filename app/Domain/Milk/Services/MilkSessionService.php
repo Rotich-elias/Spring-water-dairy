@@ -3,6 +3,7 @@
 namespace App\Domain\Milk\Services;
 
 use App\Domain\Animals\Models\Animal;
+use App\Domain\Milk\MilkSessionSchedule;
 use App\Domain\Milk\Models\MilkRecord;
 use App\Models\Lookup;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -17,7 +18,7 @@ class MilkSessionService
      * @param  array{
      *   client_uuid: string,
      *   record_date: string,
-     *   session: 'morning'|'evening',
+     *   session: 'morning'|'midday'|'evening',
      *   entries: list<{animal_id: int, litres: float, cmt_score: float|null, scc: int|null}>
      * }  $data
      * @return array{saved: int, skipped: int, warnings: int, entries: list<array>}
@@ -177,15 +178,37 @@ class MilkSessionService
             ->orderBy('ear_tag')
             ->get();
 
+        $sessionRank = array_flip(MilkSessionSchedule::ALL);
+
+        $recordsForDate = MilkRecord::query()
+            ->whereDate('record_date', $date)
+            ->get()
+            ->groupBy('animal_id');
+
         $sheet = [];
 
         foreach ($lactatingAnimals as $animal) {
-            $lastRecord = $animal->milkRecords->first();
-            $alreadyRecorded = MilkRecord::query()
-                ->where('animal_id', $animal->id)
-                ->whereDate('record_date', $date)
-                ->where('session', $session)
-                ->exists();
+            $animalToday = $recordsForDate->get($animal->id, collect());
+            $sessionRecord = $animalToday->firstWhere('session', $session);
+
+            // "Last" is the most recent yield before this session: earlier
+            // sessions today count, later ones do not.
+            $lastRecord = $animal->milkRecords
+                ->filter(function (MilkRecord $record) use ($date, $session, $sessionRank) {
+                    $recordDate = $record->record_date->toDateString();
+
+                    if ($recordDate !== $date) {
+                        return $recordDate < $date;
+                    }
+
+                    return ($sessionRank[$record->session] ?? 0) < ($sessionRank[$session] ?? 0);
+                })
+                ->sortByDesc(fn (MilkRecord $record) => sprintf(
+                    '%s-%02d',
+                    $record->record_date->toDateString(),
+                    $sessionRank[$record->session] ?? 0,
+                ))
+                ->first();
 
             $sheet[] = [
                 'id' => $animal->id,
@@ -194,9 +217,11 @@ class MilkSessionService
                 // decimal casts serialise as strings; the API contract promises numbers.
                 'last_yield' => $lastRecord ? (float) $lastRecord->litres : null,
                 'last_record_date' => $lastRecord?->record_date,
+                'recorded_litres' => $sessionRecord ? (float) $sessionRecord->litres : null,
+                'day_litres' => (float) $animalToday->sum('litres'),
                 'dims' => $animal->days_in_milk,
                 'in_withholding' => (bool) $animal->in_withholding,
-                'already_recorded' => $alreadyRecorded,
+                'already_recorded' => $sessionRecord !== null,
             ];
         }
 

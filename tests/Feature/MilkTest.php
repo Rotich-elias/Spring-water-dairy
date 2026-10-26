@@ -66,6 +66,75 @@ test('session sheet lists only milking cows and returns a numeric last yield', f
         ->and($res->json('data.cows.0.last_yield'))->toBe(14.5);
 });
 
+test('a midday milk session can be recorded and listed', function () {
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $cow = Animal::factory()->female()->ofCategory($category->id)->create(['ear_tag' => 'MIDDAY-1']);
+    $testDate = now()->toDateString();
+
+    $save = $this->withHeaders(['Authorization' => 'Bearer '.milkMilkerToken()])
+        ->postJson('/api/v1/milk/sessions', [
+            'client_uuid' => (string) Str::uuid(),
+            'record_date' => $testDate,
+            'session' => 'midday',
+            'entries' => [['animal_id' => $cow->id, 'litres' => 9.5]],
+        ]);
+
+    $save->assertStatus(200);
+    expect($save->json('data.saved'))->toBe(1);
+
+    $sheet = $this->withHeaders(['Authorization' => 'Bearer '.milkMilkerToken()])
+        ->getJson('/api/v1/milk/sessions?date='.$testDate.'&session=midday');
+
+    $sheet->assertStatus(200);
+
+    $row = collect($sheet->json('data.cows'))->firstWhere('ear_tag', 'MIDDAY-1');
+
+    expect($row)->not->toBeNull();
+    expect($row['already_recorded'])->toBeTrue();
+});
+
+test('session sheet totals include both sessions while last yield excludes the current one', function () {
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $cow = Animal::factory()->female()->ofCategory($category->id)->create(['ear_tag' => 'TOTAL-1']);
+    $testDate = now()->toDateString();
+
+    MilkRecord::factory()->create([
+        'animal_id' => $cow->id,
+        'record_date' => $testDate,
+        'session' => 'morning',
+        'litres' => 3,
+    ]);
+    MilkRecord::factory()->create([
+        'animal_id' => $cow->id,
+        'record_date' => $testDate,
+        'session' => 'evening',
+        'litres' => 7,
+    ]);
+
+    $evening = $this->withHeaders(['Authorization' => 'Bearer '.milkMilkerToken()])
+        ->getJson('/api/v1/milk/sessions?date='.$testDate.'&session=evening');
+
+    $evening->assertStatus(200);
+
+    $row = collect($evening->json('data.cows'))->firstWhere('ear_tag', 'TOTAL-1');
+
+    expect((float) $row['last_yield'])->toBe(3.0);
+    expect((float) $row['recorded_litres'])->toBe(7.0);
+    expect((float) $row['day_litres'])->toBe(10.0);
+    expect((float) $evening->json('data.summary.session_total'))->toBe(7.0);
+    expect((float) $evening->json('data.summary.day_total'))->toBe(10.0);
+
+    $morning = $this->withHeaders(['Authorization' => 'Bearer '.milkMilkerToken()])
+        ->getJson('/api/v1/milk/sessions?date='.$testDate.'&session=morning');
+
+    $morningRow = collect($morning->json('data.cows'))->firstWhere('ear_tag', 'TOTAL-1');
+
+    expect($morningRow['last_yield'])->toBeNull();
+    expect((float) $morningRow['day_litres'])->toBe(10.0);
+    expect((float) $morning->json('data.summary.session_total'))->toBe(3.0);
+    expect((float) $morning->json('data.summary.day_total'))->toBe(10.0);
+});
+
 test('milker can save a milk session', function () {
     $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
     $cow = Animal::factory()->female()->ofCategory($category->id)->create();

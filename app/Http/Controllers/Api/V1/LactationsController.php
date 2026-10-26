@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Animals\Models\Animal;
+use App\Domain\Milk\MilkSessionSchedule;
 use App\Domain\Milk\Models\Lactation;
 use App\Domain\Milk\Models\MilkRecord;
 use App\Domain\Milk\Services\LactationService;
@@ -80,12 +81,17 @@ class LactationsController extends Controller
             'ear_tag' => $animal->ear_tag,
             'days_in_milk' => $animal->days_in_milk,
             'lactation' => $lactation,
-            'daily_records' => $records->groupBy('record_date')->map(fn ($dayRecords, $date) => [
-                'date' => $date,
-                'morning' => $dayRecords->firstWhere('session', 'morning')?->litres,
-                'evening' => $dayRecords->firstWhere('session', 'evening')?->litres,
-                'total' => $dayRecords->sum('litres'),
-            ])->all(),
+            'daily_records' => $records->groupBy('record_date')->map(function ($dayRecords, $date) {
+                $row = ['date' => $date];
+
+                foreach (MilkSessionSchedule::ALL as $session) {
+                    $row[$session] = $dayRecords->firstWhere('session', $session)?->litres;
+                }
+
+                $row['total'] = $dayRecords->sum('litres');
+
+                return $row;
+            })->all(),
         ]]);
     }
 }

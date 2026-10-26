@@ -16,7 +16,7 @@ class CalvingStoreRequest extends FormRequest
         return [
             'client_uuid' => ['sometimes', 'string', 'uuid'],
             'dam_id' => ['required', 'integer', 'exists:animals,id'],
-            'calving_date' => ['required', 'date', 'before_or_equal:today'],
+            'calving_date' => ['required', 'date', 'before_or_equal:now'],
             'ease_score_id' => ['sometimes', 'nullable', 'integer', 'exists:lookups,id'],
             'retained_placenta' => ['sometimes', 'boolean'],
             'notes' => ['nullable', 'string'],

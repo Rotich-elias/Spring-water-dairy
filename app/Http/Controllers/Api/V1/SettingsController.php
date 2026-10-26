@@ -17,6 +17,15 @@ class SettingsController extends Controller
         return response()->json(['data' => $this->settings->all()]);
     }
 
+    /**
+     * Public subset for operational screens. Any authenticated user may read
+     * these; they never include sensitive configuration.
+     */
+    public function publicIndex()
+    {
+        return response()->json(['data' => $this->settings->public()]);
+    }
+
     public function update(SettingsUpdateRequest $request)
     {
         $data = $this->settings->update($request->validated()['settings']);

@@ -58,6 +58,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
         Route::prefix('settings')->name('settings.')->group(function () {
             Route::get('/', [SettingsController::class, 'index'])->name('index');
+            Route::get('/public', [SettingsController::class, 'publicIndex'])->name('public');
             Route::patch('/', [SettingsController::class, 'update'])->name('update');
         });
 

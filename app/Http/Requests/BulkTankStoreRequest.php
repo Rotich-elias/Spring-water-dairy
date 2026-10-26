@@ -16,7 +16,7 @@ class BulkTankStoreRequest extends FormRequest
         return [
             'client_uuid' => ['required', 'string', 'uuid'],
             'record_date' => ['required', 'date', 'before_or_equal:today'],
-            'session' => ['required', 'in:morning,evening'],
+            'session' => ['required', 'in:morning,midday,evening'],
             'litres_collected' => ['required', 'numeric', 'min:0'],
             'litres_sold' => ['required', 'numeric', 'min:0'],
             'litres_discarded' => ['required', 'numeric', 'min:0'],

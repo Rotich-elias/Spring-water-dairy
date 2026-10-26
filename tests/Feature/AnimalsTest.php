@@ -162,6 +162,30 @@ test('owner can update an animal', function () {
     expect($res->json('data.version'))->toBe($animal->version + 1);
 });
 
+test('owner can clear optional animal details', function () {
+    $animal = Animal::factory()->create([
+        'name' => 'Bessie',
+        'birth_date' => '2023-01-15',
+    ]);
+
+    $res = $this->withHeaders(authHeader(ownerToken()))
+        ->withHeader('If-Match', $animal->version)
+        ->patchJson('/api/v1/animals/'.$animal->id, [
+            'name' => null,
+            'birth_date' => null,
+            'pen_id' => null,
+            'status_id' => null,
+            'breed_id' => null,
+        ]);
+
+    $res->assertStatus(200);
+    expect($res->json('data.name'))->toBeNull();
+    expect($res->json('data.birth_date'))->toBeNull();
+    expect($res->json('data.pen_id'))->toBeNull();
+    expect($res->json('data.status_id'))->toBeNull();
+    expect($res->json('data.breed_id'))->toBeNull();
+});
+
 test('stale If-Match returns 409 conflict', function () {
     $animal = Animal::factory()->create();
 
