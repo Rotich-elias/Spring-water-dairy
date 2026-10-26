@@ -63,6 +63,16 @@ test('owner can record a treatment', function () {
     expect($data['meat_safe_date'])->toBe(now()->addDays(14)->toDateString().'T00:00:00.000000Z');
 });
 
+test('milker can view health records', function () {
+    $this->withHeaders(['Authorization' => 'Bearer '.healthMilkerToken()])
+        ->getJson('/api/v1/treatments')
+        ->assertOk();
+
+    $this->withHeaders(['Authorization' => 'Bearer '.healthMilkerToken()])
+        ->getJson('/api/v1/vaccinations')
+        ->assertOk();
+});
+
 test('milker cannot record a treatment (health.create intentionally omitted)', function () {
     $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
     $cow = Animal::factory()->female()->ofCategory($category->id)->create();

@@ -42,10 +42,10 @@ class TasksController extends Controller
         Gate::authorize('tasks.create');
 
         $task = Task::create(array_merge($request->validated(), [
-            'user_id' => $request->input('assigned_to', auth()->id()),
+            'user_id' => $request->validated('user_id') ?? auth()->id(),
         ]));
 
-        return response()->json(['data' => new TaskResource($task)], 201);
+        return response()->json(['data' => new TaskResource($task->refresh())], 201);
     }
 
     public function show(Task $task)
@@ -57,8 +57,8 @@ class TasksController extends Controller
 
     public function update(TaskUpdateRequest $request, Task $task)
     {
-        Gate::authorize('tasks.update', $task);
-
+        // Authorization is handled by TaskUpdateRequest: managers may edit any
+        // task, while tasks.complete holders may only tick their own task off.
         $task->update($request->validated());
 
         return response()->json(['data' => new TaskResource($task->fresh())]);

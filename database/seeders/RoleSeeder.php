@@ -44,14 +44,17 @@ class RoleSeeder extends Seeder
             ],
             'Milker' => [
                 'animals.view',
+                'lookups.view',
                 'milk.view', 'milk.create', 'milk.update',
                 'calves.view', 'calves.create',
-                // health.create intentionally omitted: Milker only observes, doesn't create treatments
+                // Milker observes health/withholding but cannot record treatments.
+                'health.view',
                 'dashboard.view',
-                'notifications.view', 'tasks.view',
+                'notifications.view', 'tasks.view', 'tasks.complete',
             ],
             'AI Tech' => [
                 'animals.view',
+                'lookups.view',
                 'breeding.view', 'breeding.create', 'breeding.update',
                 'calves.view',
                 'dashboard.view',
@@ -59,6 +62,7 @@ class RoleSeeder extends Seeder
             ],
             'Vet' => [
                 'animals.view',
+                'lookups.view',
                 'breeding.view',
                 'health.view', 'health.create', 'health.update', 'health.delete',
                 'dashboard.view',
@@ -66,6 +70,7 @@ class RoleSeeder extends Seeder
             ],
             'Viewer' => [
                 'animals.view',
+                'lookups.view',
                 'milk.view',
                 'breeding.view',
                 'calves.view',

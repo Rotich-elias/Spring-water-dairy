@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\User;
+
 test('lookups/all returns every lookup list', function () {
     $token = $this->authenticateAsOwner();
 
@@ -14,6 +16,23 @@ test('lookups/all returns every lookup list', function () {
     ]);
     expect($data['categories'])->toBeArray();
     expect($data['categories'][0])->toHaveKeys(['id', 'name', 'active', 'sort_order']);
+});
+
+test('milker can view lookups but not edit them', function () {
+    $milker = User::factory()->create();
+    $milker->assignRole('Milker');
+    $token = $milker->createToken('test')->plainTextToken;
+
+    $this->withHeader('Authorization', 'Bearer '.$token)
+        ->getJson('/api/v1/lookups/all')
+        ->assertOk();
+
+    $this->withHeader('Authorization', 'Bearer '.$token)
+        ->postJson('/api/v1/lookups', [
+            'type' => 'breeds',
+            'name' => 'Milker-created breed',
+        ])
+        ->assertForbidden();
 });
 
 test('lookups/{type} returns one lookup list', function () {

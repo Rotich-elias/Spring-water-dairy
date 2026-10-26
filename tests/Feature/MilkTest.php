@@ -43,6 +43,29 @@ test('milker can view session sheet', function () {
     expect($res->json('data.summary.cows_missing'))->toBe(3);
 });
 
+test('session sheet lists only milking cows and returns a numeric last yield', function () {
+    $milkingCategory = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $heiferCategory = Lookup::where('type', 'categories')->where('name', 'Heifers')->first();
+
+    $cow = Animal::factory()->female()->ofCategory($milkingCategory->id)->create(['ear_tag' => 'MILK-1']);
+    Animal::factory()->female()->ofCategory($heiferCategory->id)->create(['ear_tag' => 'HEIFER-1']);
+
+    MilkRecord::factory()->create([
+        'animal_id' => $cow->id,
+        'record_date' => now()->subDay()->toDateString(),
+        'session' => 'morning',
+        'litres' => 14.5,
+    ]);
+
+    $res = $this->withHeaders(['Authorization' => 'Bearer '.milkMilkerToken()])
+        ->getJson('/api/v1/milk/sessions?date='.now()->toDateString().'&session=morning');
+
+    $res->assertStatus(200);
+    expect($res->json('data.cows'))->toHaveCount(1)
+        ->and($res->json('data.cows.0.ear_tag'))->toBe('MILK-1')
+        ->and($res->json('data.cows.0.last_yield'))->toBe(14.5);
+});
+
 test('milker can save a milk session', function () {
     $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
     $cow = Animal::factory()->female()->ofCategory($category->id)->create();
@@ -93,7 +116,42 @@ test('session save is idempotent: same client_uuid returns original result', fun
     $secondId = $second->json('data.entries.0.id');
     expect($secondId)->toBe($firstId);
     expect($second->json('data.replayed'))->toBe(true);
+    expect($second->json('data.client_uuid'))->toBe($uuid);
     expect(MilkRecord::where('animal_id', $cow->id)->count())->toBe(1);
+});
+
+test('session save stores a unique client_uuid per record', function () {
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $cows = Animal::factory()->count(2)->female()->ofCategory($category->id)->create();
+    $sessionUuid = (string) Str::uuid();
+    $testDate = now()->toDateString();
+
+    $payload = [
+        'client_uuid' => $sessionUuid,
+        'record_date' => $testDate,
+        'session' => 'morning',
+        'entries' => $cows->map(fn (Animal $cow) => ['animal_id' => $cow->id, 'litres' => 12.0])->all(),
+    ];
+
+    $first = $this->withHeaders(['Authorization' => 'Bearer '.milkMilkerToken()])
+        ->postJson('/api/v1/milk/sessions', $payload);
+
+    $first->assertStatus(200);
+    expect($first->json('data.saved'))->toBe(2);
+
+    $records = MilkRecord::whereDate('record_date', $testDate)->get();
+    expect($records)->toHaveCount(2);
+    expect($records->pluck('client_uuid')->unique())->toHaveCount(2);
+    expect($records->pluck('session_uuid')->unique()->all())->toBe([$sessionUuid]);
+    expect($records->pluck('client_uuid')->filter()->count())->toBe(2);
+
+    $replay = $this->withHeaders(['Authorization' => 'Bearer '.milkMilkerToken()])
+        ->postJson('/api/v1/milk/sessions', $payload);
+
+    $replay->assertStatus(200);
+    expect($replay->json('data.replayed'))->toBe(true);
+    expect($replay->json('data.entries'))->toHaveCount(2);
+    expect(MilkRecord::whereDate('record_date', $testDate)->count())->toBe(2);
 });
 
 test('male animal is skipped in session save', function () {
@@ -155,6 +213,31 @@ test('individual milk record create and update', function () {
 
     $updateRes->assertStatus(200);
     expect($updateRes->json('data.litres'))->toBe('16.00');
+});
+
+test('individual milk record create is idempotent on client_uuid', function () {
+    $category = Lookup::where('type', 'categories')->where('name', 'Milking Cows')->first();
+    $cow = Animal::factory()->female()->ofCategory($category->id)->create();
+    $uuid = (string) Str::uuid();
+    $payload = [
+        'client_uuid' => $uuid,
+        'animal_id' => $cow->id,
+        'record_date' => now()->toDateString(),
+        'session' => 'morning',
+        'litres' => 15.0,
+    ];
+
+    $first = $this->withHeaders(['Authorization' => 'Bearer '.milkOwnerToken()])
+        ->postJson('/api/v1/milk/milk-records', $payload);
+
+    $first->assertStatus(201);
+
+    $second = $this->withHeaders(['Authorization' => 'Bearer '.milkOwnerToken()])
+        ->postJson('/api/v1/milk/milk-records', $payload);
+
+    $second->assertOk();
+    expect($second->json('data.id'))->toBe($first->json('data.id'));
+    expect(MilkRecord::where('client_uuid', $uuid)->count())->toBe(1);
 });
 
 test('stale If-Match returns 409 conflict on milk record update', function () {

@@ -17,6 +17,7 @@ class MilkRecord extends Model
 
     protected $fillable = [
         'client_uuid',
+        'session_uuid',
         'animal_id',
         'record_date',
         'session',

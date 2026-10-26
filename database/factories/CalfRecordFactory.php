@@ -18,7 +18,7 @@ class CalfRecordFactory extends Factory
             'colostrum_hours' => fake()->optional()->numberBetween(1, 12),
             'navel_dip' => fake()->boolean(),
             'disbudding' => fake()->boolean(),
-            'weaning_date' => fake()->optional()->dateTimeBetween('-30 days', 'today')->format('Y-m-d'),
+            'weaning_date' => fake()->optional()->dateTimeBetween('-30 days', 'today')?->format('Y-m-d'),
             'weaning_weight' => fake()->optional()->randomFloat(2, 30, 100),
             'birth_weight' => fake()->randomFloat(2, 25, 50),
             'outcome' => 'live',

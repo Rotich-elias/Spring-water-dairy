@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\MilkRecordStoreRequest;
 use App\Http\Requests\MilkRecordUpdateRequest;
 use App\Http\Resources\MilkRecordResource;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
@@ -64,11 +65,40 @@ class MilkRecordsController extends Controller
             }
         }
 
-        $record = MilkRecord::create(array_merge($validated, [
-            'client_uuid' => $clientUuid ?? (string) Str::uuid(),
-        ]));
+        try {
+            $record = MilkRecord::create(array_merge($validated, [
+                'client_uuid' => $clientUuid ?? (string) Str::uuid(),
+            ]));
+        } catch (UniqueConstraintViolationException $exception) {
+            // A duplicate submission can race the pre-check above (or reuse an
+            // animal/date/session slot). Return the stored record instead of 500.
+            $existing = $this->findExistingRecord($validated, $clientUuid);
 
-        return response()->json(['data' => new MilkRecordResource($record->load('animal'))], 201);
+            if (! $existing) {
+                throw $exception;
+            }
+
+            return response()->json(['data' => new MilkRecordResource($existing->load('animal'))]);
+        }
+
+        return response()->json(['data' => new MilkRecordResource($record->refresh()->load('animal'))], 201);
+    }
+
+    private function findExistingRecord(array $validated, ?string $clientUuid): ?MilkRecord
+    {
+        if ($clientUuid) {
+            $existing = MilkRecord::where('client_uuid', $clientUuid)->first();
+
+            if ($existing) {
+                return $existing;
+            }
+        }
+
+        return MilkRecord::query()
+            ->where('animal_id', $validated['animal_id'])
+            ->whereDate('record_date', $validated['record_date'])
+            ->where('session', $validated['session'])
+            ->first();
     }
 
     public function show(MilkRecord $record)
