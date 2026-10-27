@@ -285,4 +285,183 @@ class AnimalsController extends Controller
 
         return response()->json(['data' => AnimalResource::collection($animals)]);
     }
+
+    public function import(Request $request)
+    {
+        Gate::authorize('animals.create');
+
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:csv,txt', 'max:5120'],
+        ]);
+
+        $file = $request->file('file');
+        $path = $file->getRealPath();
+        $handle = fopen($path, 'r');
+
+        if (! $handle) {
+            return response()->json(['error' => ['code' => 'bad_request', 'message' => 'Unable to read file.']], 400);
+        }
+
+        $header = fgetcsv($handle);
+        if (! $header) {
+            fclose($handle);
+            return response()->json(['error' => ['code' => 'bad_request', 'message' => 'Invalid CSV file.']], 422);
+        }
+
+        $header = array_map(function ($h) {
+            return strtolower(trim($h));
+        }, $header);
+
+        $tagPattern = config('app.ear_tag_pattern', '^[A-Z]{3,5}-\d{1,5}$');
+
+        $rows = [];
+        while (($data = fgetcsv($handle)) !== false) {
+            if (count($data) === 1 && trim($data[0]) === '') {
+                continue;
+            }
+            $row = [];
+            foreach ($header as $i => $key) {
+                if ($key === '') {
+                    continue;
+                }
+                $row[$key] = isset($data[$i]) ? trim($data[$i]) : null;
+                if ($row[$key] === '') {
+                    $row[$key] = null;
+                }
+            }
+            if (! empty($row)) {
+                $rows[] = $row;
+            }
+        }
+        fclose($handle);
+
+        if (count($rows) === 0) {
+            return response()->json(['error' => ['code' => 'bad_request', 'message' => 'No rows found in CSV.']], 422);
+        }
+
+        if (count($rows) > 200) {
+            return response()->json(['error' => ['code' => 'bad_request', 'message' => 'A bulk import may include at most 200 animals.']], 422);
+        }
+
+        $created = 0;
+        $failed = 0;
+        $results = [];
+        $seenEarTags = [];
+        $seenClientUuids = [];
+
+        foreach ($rows as $index => $row) {
+            $clientUuid = (string) Str::uuid();
+            $rowData = $row;
+            unset($rowData['client_uuid']);
+
+            if (isset($rowData['ear_tag'])) {
+                $rowData['ear_tag'] = strtoupper($rowData['ear_tag']);
+            }
+
+            $errors = [];
+
+            if (blank($rowData['ear_tag'] ?? null)) {
+                $errors['ear_tag'][] = 'The ear tag field is required.';
+            } elseif (! preg_match('/'.$tagPattern.'/', $rowData['ear_tag'])) {
+                $errors['ear_tag'][] = 'The ear tag format is invalid.';
+            } elseif (isset($seenEarTags[$rowData['ear_tag']])) {
+                $errors['ear_tag'][] = 'The ear tag has already been taken.';
+            } elseif (Animal::where('ear_tag', $rowData['ear_tag'])->whereNull('deleted_at')->exists()) {
+                $errors['ear_tag'][] = 'The ear tag has already been taken.';
+            } else {
+                $seenEarTags[$rowData['ear_tag']] = true;
+            }
+
+            if (isset($rowData['category_id']) && $rowData['category_id'] !== null) {
+                if (! is_numeric($rowData['category_id']) || ! Lookup::where('id', (int) $rowData['category_id'])->whereNull('deleted_at')->exists()) {
+                    $errors['category_id'][] = 'The selected category is invalid.';
+                } else {
+                    $rowData['category_id'] = (int) $rowData['category_id'];
+                }
+            } elseif (! isset($rowData['category_id']) || $rowData['category_id'] === null) {
+                // Try to find a default category
+                $defaultCat = Lookup::where('type', 'animal_category')->whereNull('deleted_at')->orderBy('id')->first();
+                if ($defaultCat) {
+                    $rowData['category_id'] = $defaultCat->id;
+                } else {
+                    $errors['category_id'][] = 'The category field is required.';
+                }
+            }
+
+            if (isset($rowData['pen_id']) && $rowData['pen_id'] !== null && is_numeric($rowData['pen_id'])) {
+                if (! Lookup::where('id', (int) $rowData['pen_id'])->whereNull('deleted_at')->exists()) {
+                    $errors['pen_id'][] = 'The selected pen is invalid.';
+                } else {
+                    $rowData['pen_id'] = (int) $rowData['pen_id'];
+                }
+            } elseif (isset($rowData['pen_id'])) {
+                $rowData['pen_id'] = null;
+            }
+
+            if (isset($rowData['status_id']) && $rowData['status_id'] !== null && is_numeric($rowData['status_id'])) {
+                if (! Lookup::where('id', (int) $rowData['status_id'])->whereNull('deleted_at')->exists()) {
+                    $errors['status_id'][] = 'The selected status is invalid.';
+                } else {
+                    $rowData['status_id'] = (int) $rowData['status_id'];
+                }
+            } elseif (isset($rowData['status_id'])) {
+                $rowData['status_id'] = null;
+            }
+
+            if (isset($rowData['breed_id']) && $rowData['breed_id'] !== null && is_numeric($rowData['breed_id'])) {
+                if (! Lookup::where('id', (int) $rowData['breed_id'])->whereNull('deleted_at')->exists()) {
+                    $errors['breed_id'][] = 'The selected breed is invalid.';
+                } else {
+                    $rowData['breed_id'] = (int) $rowData['breed_id'];
+                }
+            } elseif (isset($rowData['breed_id'])) {
+                $rowData['breed_id'] = null;
+            }
+
+            if (isset($rowData['sex'])) {
+                $rowData['sex'] = strtoupper($rowData['sex']);
+                if (! in_array($rowData['sex'], ['M', 'F'])) {
+                    $errors['sex'][] = 'Sex must be M (male) or F (female).';
+                }
+            } else {
+                $rowData['sex'] = 'F';
+            }
+
+            if (isset($rowData['birth_date']) && $rowData['birth_date'] !== null) {
+                try {
+                    if (! Carbon::parse($rowData['birth_date'])->lte(Carbon::today())) {
+                        $errors['birth_date'][] = 'The birth date cannot be in the future.';
+                    }
+                } catch (\Throwable $e) {
+                    $errors['birth_date'][] = 'The birth date is invalid.';
+                }
+            }
+
+            if (! empty($errors)) {
+                $results[] = ['index' => $index, 'status' => 'failed', 'errors' => $errors];
+                $failed++;
+                continue;
+            }
+
+            try {
+                $animal = Animal::create(array_merge($rowData, ['client_uuid' => $clientUuid]));
+                $results[] = ['index' => $index, 'status' => 'created', 'id' => $animal->id];
+                $created++;
+            } catch (\Throwable $e) {
+                $results[] = [
+                    'index' => $index,
+                    'status' => 'failed',
+                    'errors' => ['__general' => [$e->getMessage()]],
+                ];
+                $failed++;
+            }
+        }
+
+        return response()->json(['data' => [
+            'created' => $created,
+            'failed' => $failed,
+            'results' => $results,
+        ]]);
+    }
+
 }

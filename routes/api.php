@@ -79,6 +79,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::get('/', [AnimalsController::class, 'index'])->name('index');
             Route::post('/', [AnimalsController::class, 'store'])->name('store');
             Route::post('/bulk', [AnimalsController::class, 'bulk'])->name('bulk');
+            Route::post('/import', [AnimalsController::class, 'import'])->name('import');
             Route::get('/lookup', [AnimalsController::class, 'lookup'])->name('lookup');
             Route::get('/{animal}', [AnimalsController::class, 'show'])->name('show');
             Route::patch('/{animal}', [AnimalsController::class, 'update'])->name('update');

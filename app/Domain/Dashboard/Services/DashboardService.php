@@ -177,14 +177,13 @@ class DashboardService
         $endDate = today()->toDateString();
 
         $daily = MilkRecord::query()
-            ->where('record_date', '>=', $startDate)
-            ->where('record_date', '<=', $endDate)
+            ->whereBetween(DB::raw('DATE(record_date)'), [$startDate, $endDate])
             ->where('excluded_from_sales', false)
-            ->select('record_date', DB::raw('SUM(litres) as total_litres'))
-            ->groupBy('record_date')
-            ->orderBy('record_date')
+            ->select(DB::raw('DATE(record_date) as day'), DB::raw('SUM(litres) as total_litres'))
+            ->groupBy(DB::raw('DATE(record_date)'))
+            ->orderBy('day')
             ->get()
-            ->keyBy('record_date');
+            ->keyBy('day');
 
         $series = [];
         $current = today()->subDays($days - 1);

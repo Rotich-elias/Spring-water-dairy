@@ -81,7 +81,9 @@ class LactationsController extends Controller
             'ear_tag' => $animal->ear_tag,
             'days_in_milk' => $animal->days_in_milk,
             'lactation' => $lactation,
-            'daily_records' => $records->groupBy('record_date')->map(function ($dayRecords, $date) {
+            'daily_records' => $records->groupBy(function ($record) {
+                return \Carbon\Carbon::parse($record->record_date)->toDateString();
+            })->map(function ($dayRecords, $date) {
                 $row = ['date' => $date];
 
                 foreach (MilkSessionSchedule::ALL as $session) {
@@ -91,7 +93,7 @@ class LactationsController extends Controller
                 $row['total'] = $dayRecords->sum('litres');
 
                 return $row;
-            })->all(),
+            })->values()->all(),
         ]]);
     }
 }

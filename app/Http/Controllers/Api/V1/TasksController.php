@@ -18,6 +18,13 @@ class TasksController extends Controller
 
         $query = Task::query()->with('user');
 
+        $user = $request->user();
+        if ($user && ! $user->can('tasks.update') && ! $user->can('tasks.create') && ! $user->can('tasks.delete')) {
+            if ($user->can('tasks.complete')) {
+                $query->where('user_id', $user->id);
+            }
+        }
+
         if ($request->filled('is_completed')) {
             $query->where('is_completed', $request->boolean('is_completed'));
         }
