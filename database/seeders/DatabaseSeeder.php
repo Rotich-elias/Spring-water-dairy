@@ -15,13 +15,25 @@ class DatabaseSeeder extends Seeder
         $this->call(LookupSeeder::class);
         $this->call(BenchmarkSeeder::class);
 
-        // Initial Owner account from environment variables.
+        // Initial Owner account from environment variables. Keep this idempotent
+        // so seeding can be re-run safely after a redeploy; an existing Owner's
+        // password is never overwritten.
         app(PermissionRegistrar::class)->forgetCachedPermissions();
-        $owner = User::factory()->create([
-            'name' => 'Owner',
-            'email' => env('APP_OWNER_EMAIL', 'owner@springwaterdairy.local'),
-            'password' => bcrypt(env('APP_OWNER_PASSWORD', 'change-me-immediately')),
-        ]);
+        $ownerEmail = env('APP_OWNER_EMAIL', 'owner@springwaterdairy.local');
+        $ownerPassword = env('APP_OWNER_PASSWORD');
+
+        if (app()->environment('production')
+            && (empty($ownerPassword) || $ownerPassword === 'change-me-immediately')) {
+            throw new \RuntimeException('Set a strong APP_OWNER_PASSWORD before seeding in production.');
+        }
+
+        $owner = User::firstOrCreate(
+            ['email' => $ownerEmail],
+            [
+                'name' => 'Owner',
+                'password' => bcrypt($ownerPassword ?: 'change-me-immediately'),
+            ]
+        );
         $role = Role::firstOrCreate(
             ['name' => 'Owner', 'guard_name' => 'api']
         );

@@ -25,3 +25,12 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+.env.*
+!.env.example
+*.sqlite
+*.sqlite-journal
+*.sql
+*.sql.gz
+*.pem
+*.key
+/backups

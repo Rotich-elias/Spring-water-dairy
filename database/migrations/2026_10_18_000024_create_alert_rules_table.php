@@ -13,8 +13,9 @@ return new class extends Migration
             $table->string('name'); // e.g. "PD due", "Dry off in 7 days", "Calving in 3 days"
             $table->string('type'); // pd_due, dry_off_due, calving_due, heat_window, no_service_day_80, withholding_ending, vaccination_due, calf_behind_target, calf_due_weaning
             $table->text('conditions')->nullable(); // configurable thresholds
-            $table->text('channels')->default('["in_app"]'); // in_app, sms, email
-            $table->text('recipients')->default('["Owner","Manager"]'); // roles
+            // MySQL does not allow defaults on TEXT columns; defaults live on the model.
+            $table->text('channels')->nullable(); // in_app, sms, email
+            $table->text('recipients')->nullable(); // roles
             $table->boolean('is_active')->default(true);
             $table->timestamps();
 

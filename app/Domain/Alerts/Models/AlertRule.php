@@ -19,6 +19,12 @@ class AlertRule extends Model
         'is_active',
     ];
 
+    protected $attributes = [
+        'channels' => '["in_app"]',
+        'recipients' => '["Owner","Manager"]',
+        'is_active' => true,
+    ];
+
     protected $casts = [
         'conditions' => 'array',
         'channels' => 'array',

@@ -13,7 +13,7 @@ return new class extends Migration
             $table->string('type'); // withholding, overdue_calving, missing_pd_check, etc.
             $table->string('title');
             $table->text('message');
-            $table->foreignId('animal_id')->constrained('animals')->nullOnDelete();
+            $table->foreignId('animal_id')->nullable()->constrained('animals')->nullOnDelete();
             $table->timestamp('read_at')->nullable();
             $table->timestamp('dismissed_at')->nullable();
             $table->timestamps();

@@ -20,10 +20,20 @@ return new class extends Migration
 
             $table->index(['bull_code']);
         });
+
+        Schema::table('services', function (Blueprint $table) {
+            $table->foreign('bull_id')->references('id')->on('semen_straws')->nullOnDelete();
+        });
     }
 
     public function down(): void
     {
+        if (Schema::hasTable('services')) {
+            Schema::table('services', function (Blueprint $table) {
+                $table->dropForeign(['bull_id']);
+            });
+        }
+
         Schema::dropIfExists('semen_straws');
     }
 };

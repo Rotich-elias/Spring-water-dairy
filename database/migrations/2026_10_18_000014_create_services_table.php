@@ -13,7 +13,9 @@ return new class extends Migration
             $table->string('client_uuid')->nullable()->unique();
             $table->foreignId('animal_id')->constrained('animals');
             $table->date('service_date');
-            $table->foreignId('bull_id')->nullable()->constrained('semen_straws');
+            // The semen_straws table is created in a later migration, so the
+            // foreign key is added there once the table exists.
+            $table->foreignId('bull_id')->nullable();
             $table->string('inseminator')->nullable();
             $table->enum('service_type', ['AI', 'Natural'])->default('AI');
             $table->date('expected_calving_date');
