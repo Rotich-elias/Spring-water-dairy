@@ -27,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
         AuditServiceProvider::class,
     ])
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->trustProxies(at: '*');
         $middleware->redirectGuestsTo(function (Illuminate\Http\Request $request) {
             if ($request->is('api/*') || $request->expectsJson()) {
                 return null;
