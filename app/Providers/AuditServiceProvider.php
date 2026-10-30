@@ -14,6 +14,7 @@ use App\Domain\Calves\Models\CalfRecord;
 use App\Domain\Calves\Models\Weight;
 use App\Domain\Health\Models\Treatment;
 use App\Domain\Health\Models\Vaccination;
+use App\Domain\Images\Models\Image;
 use App\Domain\Milk\Models\BulkTankRecord;
 use App\Domain\Milk\Models\Lactation;
 use App\Domain\Milk\Models\MilkRecord;
@@ -44,6 +45,7 @@ class AuditServiceProvider extends ServiceProvider
         CalfRecord::class,
         Treatment::class,
         Vaccination::class,
+        Image::class,
         Lookup::class,
         AlertRule::class,
     ];

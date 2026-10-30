@@ -10,6 +10,7 @@ use App\Domain\Calves\Models\CalfRecord;
 use App\Domain\Calves\Models\Weight;
 use App\Domain\Health\Models\Treatment;
 use App\Domain\Health\Models\Vaccination;
+use App\Domain\Images\Concerns\HasImages;
 use App\Domain\Milk\Models\MilkRecord;
 use App\Models\Lookup;
 use Carbon\Carbon;
@@ -26,6 +27,7 @@ use Illuminate\Support\Str;
 class Animal extends Model
 {
     use HasFactory;
+    use HasImages;
     use SoftDeletes;
 
     protected $fillable = [

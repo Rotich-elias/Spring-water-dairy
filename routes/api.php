@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\V1\CalfRecordsController;
 use App\Http\Controllers\Api\V1\CalvingsController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\HeatsController;
+use App\Http\Controllers\Api\V1\ImagesController;
 use App\Http\Controllers\Api\V1\LactationsController;
 use App\Http\Controllers\Api\V1\LookupsController;
 use App\Http\Controllers\Api\V1\MilkRecordsController;
@@ -88,6 +89,13 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::get('/{animal}/timeline', [AnimalsController::class, 'timeline'])->name('timeline');
             Route::get('/{animal}/lineage', [AnimalsController::class, 'lineage'])->name('lineage');
             Route::get('/{animal}/milk', [LactationsController::class, 'animalMilk'])->name('milk');
+        });
+
+        Route::prefix('images')->name('images.')->group(function () {
+            Route::get('/', [ImagesController::class, 'index'])->name('index');
+            Route::post('/', [ImagesController::class, 'store'])->name('store');
+            Route::patch('/{image}', [ImagesController::class, 'update'])->name('update');
+            Route::delete('/{image}', [ImagesController::class, 'destroy'])->name('destroy');
         });
 
         Route::prefix('milk')->name('milk.')->group(function () {

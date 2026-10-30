@@ -34,6 +34,7 @@ class AnimalResource extends JsonResource
             'exit_price' => $this->exit_price,
             'dam_id' => $this->dam_id,
             'sire_id' => $this->sire_id,
+            'images' => ImageResource::collection($this->whenLoaded('images')),
             'version' => $this->version,
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),

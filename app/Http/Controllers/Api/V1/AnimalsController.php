@@ -27,7 +27,7 @@ class AnimalsController extends Controller
         Gate::authorize('animals.view');
 
         $query = Animal::query()
-            ->with(['category', 'pen', 'status', 'breed'])
+            ->with(['category', 'pen', 'status', 'breed', 'images'])
             ->active();
 
         if ($request->filled('category_id')) {
@@ -80,7 +80,7 @@ class AnimalsController extends Controller
 
         $animal = Animal::create($request->validated())->fresh();
 
-        return response()->json(['data' => new AnimalResource($animal->load(['category', 'pen', 'status', 'breed']))], 201);
+        return response()->json(['data' => new AnimalResource($animal->load(['category', 'pen', 'status', 'breed', 'images']))], 201);
     }
 
     public function bulk(AnimalBulkStoreRequest $request)
@@ -171,7 +171,7 @@ class AnimalsController extends Controller
     {
         Gate::authorize('animals.view', $animal);
 
-        return response()->json(['data' => new AnimalResource($animal->load(['category', 'pen', 'status', 'breed']))]);
+        return response()->json(['data' => new AnimalResource($animal->load(['category', 'pen', 'status', 'breed', 'images']))]);
     }
 
     public function update(AnimalUpdateRequest $request, Animal $animal)
@@ -194,7 +194,7 @@ class AnimalsController extends Controller
         $animal->increment('version');
         $animal->save();
 
-        return response()->json(['data' => new AnimalResource($animal->fresh()->load(['category', 'pen', 'status', 'breed']))]);
+        return response()->json(['data' => new AnimalResource($animal->fresh()->load(['category', 'pen', 'status', 'breed', 'images']))]);
     }
 
     public function move(AnimalMoveRequest $request, Animal $animal)
@@ -203,7 +203,7 @@ class AnimalsController extends Controller
 
         $updated = $this->lifecycle->move($animal, $request->validated());
 
-        return response()->json(['data' => new AnimalResource($updated->load(['category', 'pen', 'status', 'breed']))]);
+        return response()->json(['data' => new AnimalResource($updated->load(['category', 'pen', 'status', 'breed', 'images']))]);
     }
 
     public function exit(AnimalExitRequest $request, Animal $animal)
@@ -212,7 +212,7 @@ class AnimalsController extends Controller
 
         $updated = $this->lifecycle->exit($animal, $request->validated());
 
-        return response()->json(['data' => new AnimalResource($updated->load(['category', 'pen', 'status', 'breed']))]);
+        return response()->json(['data' => new AnimalResource($updated->load(['category', 'pen', 'status', 'breed', 'images']))]);
     }
 
     public function timeline(Animal $animal)
@@ -305,6 +305,7 @@ class AnimalsController extends Controller
         $header = fgetcsv($handle);
         if (! $header) {
             fclose($handle);
+
             return response()->json(['error' => ['code' => 'bad_request', 'message' => 'Invalid CSV file.']], 422);
         }
 
@@ -440,6 +441,7 @@ class AnimalsController extends Controller
             if (! empty($errors)) {
                 $results[] = ['index' => $index, 'status' => 'failed', 'errors' => $errors];
                 $failed++;
+
                 continue;
             }
 
@@ -463,5 +465,4 @@ class AnimalsController extends Controller
             'results' => $results,
         ]]);
     }
-
 }
