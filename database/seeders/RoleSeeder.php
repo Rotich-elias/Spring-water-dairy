@@ -9,6 +9,18 @@ use Spatie\Permission\PermissionRegistrar;
 
 class RoleSeeder extends Seeder
 {
+    /**
+     * Permissions introduced with multi-tenant farms, billing and appearance.
+     *
+     * @var list<string>
+     */
+    private array $saasPermissions = [
+        'tenants.view', 'tenants.create', 'tenants.update', 'tenants.delete',
+        'appearance.view', 'appearance.update',
+        'billing.view', 'billing.manage',
+        'plans.view',
+    ];
+
     public function run(): void
     {
         app(PermissionRegistrar::class)->forgetCachedPermissions();
@@ -29,6 +41,7 @@ class RoleSeeder extends Seeder
                 'tasks.view', 'tasks.create', 'tasks.update', 'tasks.delete',
                 'system.health', 'setup.view', 'setup.complete',
             ],
+            'Admin' => [],
             'Manager' => [
                 'users.view',
                 'lookups.view', 'lookups.edit',
@@ -79,6 +92,12 @@ class RoleSeeder extends Seeder
                 'notifications.view',
             ],
         ];
+
+        $roles['Owner'] = array_merge($roles['Owner'], $this->saasPermissions);
+        $roles['Admin'] = array_values(array_diff($this->saasPermissions, ['tenants.delete', 'billing.manage']));
+        $roles['Manager'] = array_merge($roles['Manager'], [
+            'tenants.view', 'appearance.view', 'billing.view', 'plans.view',
+        ]);
 
         foreach ($roles as $roleName => $permissions) {
             $role = Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'api']);

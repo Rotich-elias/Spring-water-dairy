@@ -2,12 +2,14 @@
 
 namespace App\Providers;
 
+use App\Domain\Tenancy\TenantContext;
 use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use Spatie\Permission\Models\Role;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -16,7 +18,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(TenantContext::class);
     }
 
     /**
@@ -32,7 +34,34 @@ class AppServiceProvider extends ServiceProvider
                 return null;
             }
 
-            return $user->hasPermissionTo($ability, 'api') ? true : null;
+            $tenant = app(TenantContext::class)->tenant();
+
+            if (! $tenant) {
+                return $user->hasPermissionTo($ability, 'api') ? true : null;
+            }
+
+            $membership = $user->tenants()
+                ->whereKey($tenant->getKey())
+                ->first();
+
+            if (! $membership) {
+                return false;
+            }
+
+            $pivotRole = $membership->pivot->role;
+
+            if (! filled($pivotRole)) {
+                return $user->hasPermissionTo($ability, 'api') ? true : null;
+            }
+
+            // Membership roles take precedence inside a tenant. Legacy users
+            // assigned a Spatie role without a pivot role keep the old behavior.
+            $role = Role::query()
+                ->where('name', $pivotRole)
+                ->where('guard_name', 'api')
+                ->first();
+
+            return $role?->hasPermissionTo($ability, 'api') ? true : null;
         });
 
         RateLimiter::for('login', function (Request $request) {

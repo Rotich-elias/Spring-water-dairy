@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Billing\Services\PlanService;
 use App\Domain\Milk\Models\MilkRecord;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\MilkRecordStoreRequest;
@@ -14,6 +15,8 @@ use Illuminate\Support\Str;
 
 class MilkRecordsController extends Controller
 {
+    public function __construct(private PlanService $plans) {}
+
     public function index(Request $request)
     {
         Gate::authorize('milk.view');
@@ -64,6 +67,8 @@ class MilkRecordsController extends Controller
                 return response()->json(['data' => new MilkRecordResource($existing)]);
             }
         }
+
+        $this->plans->assertCan('milk_records_per_month');
 
         try {
             $record = MilkRecord::create(array_merge($validated, [

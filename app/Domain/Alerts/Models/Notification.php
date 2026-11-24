@@ -2,6 +2,7 @@
 
 namespace App\Domain\Alerts\Models;
 
+use App\Domain\Tenancy\Concerns\BelongsToTenant;
 use App\Models\User;
 use Database\Factories\NotificationFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,6 +12,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Notification extends Model
 {
+    use BelongsToTenant;
     use HasFactory;
     use SoftDeletes;
 

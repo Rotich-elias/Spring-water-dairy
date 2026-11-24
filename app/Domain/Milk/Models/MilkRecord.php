@@ -3,6 +3,7 @@
 namespace App\Domain\Milk\Models;
 
 use App\Domain\Animals\Models\Animal;
+use App\Domain\Tenancy\Concerns\BelongsToTenant;
 use Database\Factories\MilkRecordFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,6 +13,7 @@ use Illuminate\Support\Str;
 
 class MilkRecord extends Model
 {
+    use BelongsToTenant;
     use HasFactory;
     use SoftDeletes;
 

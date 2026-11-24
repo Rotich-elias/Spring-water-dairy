@@ -12,6 +12,7 @@ use App\Domain\Health\Models\Treatment;
 use App\Domain\Health\Models\Vaccination;
 use App\Domain\Images\Concerns\HasImages;
 use App\Domain\Milk\Models\MilkRecord;
+use App\Domain\Tenancy\Concerns\BelongsToTenant;
 use App\Models\Lookup;
 use Carbon\Carbon;
 use Database\Factories\AnimalFactory;
@@ -26,6 +27,7 @@ use Illuminate\Support\Str;
 
 class Animal extends Model
 {
+    use BelongsToTenant;
     use HasFactory;
     use HasImages;
     use SoftDeletes;

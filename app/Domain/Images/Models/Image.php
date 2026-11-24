@@ -2,6 +2,7 @@
 
 namespace App\Domain\Images\Models;
 
+use App\Domain\Tenancy\Concerns\BelongsToTenant;
 use App\Models\User;
 use Database\Factories\ImageFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\Storage;
 
 class Image extends Model
 {
+    use BelongsToTenant;
     use HasFactory;
 
     protected $fillable = [

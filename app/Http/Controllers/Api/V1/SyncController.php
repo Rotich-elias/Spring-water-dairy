@@ -30,9 +30,12 @@ class SyncController extends Controller
 
         $since = Carbon::parse($since);
 
+        // `changed_at` has second precision, so the id keeps the most recent
+        // action when a record changes twice in the same second.
         $changed = SyncState::query()
             ->where('changed_at', '>=', $since)
             ->orderByDesc('changed_at')
+            ->orderByDesc('id')
             ->get()
             ->unique(fn (SyncState $state) => $state->model.'#'.$state->record_id)
             ->values();

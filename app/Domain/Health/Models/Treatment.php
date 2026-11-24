@@ -3,6 +3,7 @@
 namespace App\Domain\Health\Models;
 
 use App\Domain\Animals\Models\Animal;
+use App\Domain\Tenancy\Concerns\BelongsToTenant;
 use App\Models\Lookup;
 use Carbon\Carbon;
 use Database\Factories\TreatmentFactory;
@@ -14,6 +15,7 @@ use Illuminate\Support\Str;
 
 class Treatment extends Model
 {
+    use BelongsToTenant;
     use HasFactory;
     use SoftDeletes;
 

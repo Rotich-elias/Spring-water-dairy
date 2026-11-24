@@ -3,6 +3,7 @@
 namespace App\Domain\Milk\Models;
 
 use App\Domain\Animals\Models\Animal;
+use App\Domain\Tenancy\Concerns\BelongsToTenant;
 use Carbon\Carbon;
 use Database\Factories\LactationFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,6 +13,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Lactation extends Model
 {
+    use BelongsToTenant;
     use HasFactory;
     use SoftDeletes;
 

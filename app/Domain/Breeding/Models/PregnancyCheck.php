@@ -3,6 +3,7 @@
 namespace App\Domain\Breeding\Models;
 
 use App\Domain\Animals\Models\Animal;
+use App\Domain\Tenancy\Concerns\BelongsToTenant;
 use App\Models\Lookup;
 use Database\Factories\PregnancyCheckFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,6 +14,7 @@ use Illuminate\Support\Str;
 
 class PregnancyCheck extends Model
 {
+    use BelongsToTenant;
     use HasFactory;
     use SoftDeletes;
 

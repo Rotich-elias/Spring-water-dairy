@@ -9,7 +9,24 @@ class LookupSeeder extends Seeder
 {
     public function run(): void
     {
-        $data = [
+        foreach (self::rows() as $type => $rows) {
+            foreach ($rows as $row) {
+                Lookup::firstOrCreate(
+                    ['type' => $type, 'name' => $row['name']],
+                    ['sort_order' => $row['sort_order'], 'active' => true]
+                );
+            }
+        }
+    }
+
+    /**
+     * Reference data shared by fresh installs and newly created tenants.
+     *
+     * @return array<string, list<array{name: string, sort_order: int}>>
+     */
+    public static function rows(): array
+    {
+        return [
             'categories' => [
                 ['name' => 'Milking Cows', 'sort_order' => 1],
                 ['name' => 'Dry Cows', 'sort_order' => 2],
@@ -66,14 +83,5 @@ class LookupSeeder extends Seeder
                 ['name' => 'Calf', 'sort_order' => 4],
             ],
         ];
-
-        foreach ($data as $type => $rows) {
-            foreach ($rows as $row) {
-                Lookup::firstOrCreate(
-                    ['type' => $type, 'name' => $row['name']],
-                    ['sort_order' => $row['sort_order'], 'active' => true]
-                );
-            }
-        }
     }
 }

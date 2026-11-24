@@ -3,6 +3,7 @@
 namespace App\Domain\Calves\Models;
 
 use App\Domain\Animals\Models\Animal;
+use App\Domain\Tenancy\Concerns\BelongsToTenant;
 use Database\Factories\CalfRecordFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,6 +12,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CalfRecord extends Model
 {
+    use BelongsToTenant;
     use HasFactory;
     use SoftDeletes;
 

@@ -3,6 +3,7 @@
 namespace App\Domain\Breeding\Models;
 
 use App\Domain\Animals\Models\Animal;
+use App\Domain\Tenancy\Concerns\BelongsToTenant;
 use Database\Factories\ServiceFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,6 +13,7 @@ use Illuminate\Support\Str;
 
 class Service extends Model
 {
+    use BelongsToTenant;
     use HasFactory;
     use SoftDeletes;
 

@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Animals\Models\Animal;
 use App\Domain\Animals\Services\AnimalLifecycleService;
+use App\Domain\Billing\Services\PlanService;
+use App\Domain\Tenancy\TenantContext;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AnimalBulkStoreRequest;
 use App\Http\Requests\AnimalExitRequest;
@@ -20,7 +22,11 @@ use Illuminate\Support\Str;
 
 class AnimalsController extends Controller
 {
-    public function __construct(private AnimalLifecycleService $lifecycle) {}
+    public function __construct(
+        private AnimalLifecycleService $lifecycle,
+        private PlanService $plans,
+        private TenantContext $tenantContext,
+    ) {}
 
     public function index(Request $request)
     {
@@ -77,6 +83,7 @@ class AnimalsController extends Controller
     public function store(AnimalStoreRequest $request)
     {
         Gate::authorize('animals.create');
+        $this->plans->assertCan('animals');
 
         $animal = Animal::create($request->validated())->fresh();
 
@@ -88,6 +95,8 @@ class AnimalsController extends Controller
         Gate::authorize('animals.create');
 
         $rows = $request->validated()['animals'];
+        $this->plans->assertCan('animals', count($rows));
+
         $tagPattern = config('app.ear_tag_pattern', '^[A-Z]{3,5}-\d{1,5}$');
 
         $created = 0;
@@ -169,6 +178,12 @@ class AnimalsController extends Controller
 
     public function show(Animal $animal)
     {
+        // Route model binding runs before the tenant middleware, so verify the
+        // resolved record explicitly against the active farm.
+        if ((int) $animal->tenant_id !== $this->tenantContext->id()) {
+            abort(404);
+        }
+
         Gate::authorize('animals.view', $animal);
 
         return response()->json(['data' => new AnimalResource($animal->load(['category', 'pen', 'status', 'breed', 'images']))]);
@@ -343,6 +358,8 @@ class AnimalsController extends Controller
         if (count($rows) > 200) {
             return response()->json(['error' => ['code' => 'bad_request', 'message' => 'A bulk import may include at most 200 animals.']], 422);
         }
+
+        $this->plans->assertCan('animals', count($rows));
 
         $created = 0;
         $failed = 0;

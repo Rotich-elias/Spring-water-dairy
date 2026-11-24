@@ -1,5 +1,7 @@
 <?php
 
+use App\Domain\Billing\Exceptions\PlanLimitExceededException;
+use App\Http\Middleware\ResolveTenant;
 use App\Providers\AuditServiceProvider;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
@@ -10,6 +12,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
@@ -27,8 +30,14 @@ return Application::configure(basePath: dirname(__DIR__))
         AuditServiceProvider::class,
     ])
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->alias([
+            'tenant' => ResolveTenant::class,
+        ]);
+        // Resolve the farm before route model binding so scoped resources are
+        // looked up in the tenant selected for this request.
+        $middleware->prependToPriorityList(SubstituteBindings::class, ResolveTenant::class);
         $middleware->trustProxies(at: '*');
-        $middleware->redirectGuestsTo(function (Illuminate\Http\Request $request) {
+        $middleware->redirectGuestsTo(function (Request $request) {
             if ($request->is('api/*') || $request->expectsJson()) {
                 return null;
             }
@@ -132,6 +141,21 @@ return Application::configure(basePath: dirname(__DIR__))
                     'message' => $e->getMessage() ?: 'The request could not be completed.',
                 ],
             ], $e->getStatusCode(), $e->getHeaders());
+        });
+
+        $exceptions->render(function (PlanLimitExceededException $e, Request $request) use ($isApi) {
+            if ($isApi($request)) {
+                return response()->json([
+                    'error' => [
+                        'code' => 'plan_limit_exceeded',
+                        'message' => $e->getMessage(),
+                        'fields' => [
+                            'limit' => [$e->key],
+                            'max' => [(string) $e->limit],
+                        ],
+                    ],
+                ], 402);
+            }
         });
 
         $exceptions->render(function (Throwable $e, Request $request) use ($isApi) {

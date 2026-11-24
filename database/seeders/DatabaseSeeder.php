@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Domain\Tenancy\Services\TenantService;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Role;
@@ -12,6 +13,12 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call(RoleSeeder::class);
+        $this->call(PlanSeeder::class);
+
+        // Establish the default farm and its context before seeding scoped data.
+        $tenants = app(TenantService::class);
+        $tenants->ensureDefaultTenant();
+
         $this->call(LookupSeeder::class);
         $this->call(BenchmarkSeeder::class);
 
@@ -38,5 +45,8 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Owner', 'guard_name' => 'api']
         );
         $owner->assignRole($role);
+
+        // Attach the Owner now that the account exists; safe to re-run.
+        $tenants->ensureDefaultTenant();
     }
 }

@@ -1,0 +1,229 @@
+<?php
+
+namespace App\Domain\Billing\Services;
+
+use App\Domain\Alerts\Models\AlertRule;
+use App\Domain\Animals\Models\Animal;
+use App\Domain\Billing\Exceptions\PlanLimitExceededException;
+use App\Domain\Milk\Models\MilkRecord;
+use App\Domain\Tenancy\Models\Plan;
+use App\Domain\Tenancy\Models\Subscription;
+use App\Domain\Tenancy\Models\Tenant;
+use App\Domain\Tenancy\TenantContext;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+use RuntimeException;
+
+class PlanService
+{
+    /** @var list<string> */
+    public const USAGE_KEYS = ['animals', 'users', 'milk_records_per_month', 'alert_rules'];
+
+    public function __construct(private TenantContext $tenantContext) {}
+
+    /**
+     * Get (or lazily create) the trialing subscription for the active tenant.
+     */
+    public function subscription(): Subscription
+    {
+        $tenantId = $this->tenantContext->id();
+
+        if ($tenantId === null) {
+            throw new RuntimeException('A tenant must be resolved before accessing billing.');
+        }
+
+        return $this->subscriptionForTenantId($tenantId);
+    }
+
+    /**
+     * The plan that governs limits. Expired/cancelled subscriptions fall back
+     * to the Starter plan while the real subscription is still returned in
+     * billing responses.
+     */
+    public function plan(): Plan
+    {
+        $subscription = $this->subscription();
+        $plan = $subscription->plan;
+
+        if ($plan !== null && $plan->is_active && $this->subscriptionIsUsable($subscription)) {
+            return $plan;
+        }
+
+        return $this->starterPlan();
+    }
+
+    /**
+     * A null limit means unlimited usage for that key.
+     */
+    public function limit(string $key): ?int
+    {
+        $limits = $this->plan()->limits;
+
+        if (! is_array($limits) || ! array_key_exists($key, $limits) || $limits[$key] === null) {
+            return null;
+        }
+
+        return (int) $limits[$key];
+    }
+
+    public function usage(string $key): int
+    {
+        return match ($key) {
+            'animals' => Animal::count(),
+            'users' => $this->tenantContext->id() === null
+                ? 0
+                : DB::table('tenant_user')->where('tenant_id', $this->tenantContext->id())->count(),
+            'milk_records_per_month' => MilkRecord::where('record_date', '>=', now()->startOfMonth())->count(),
+            'alert_rules' => AlertRule::count(),
+            default => 0,
+        };
+    }
+
+    public function can(string $key, int $additional = 1): bool
+    {
+        $limit = $this->limit($key);
+
+        return $limit === null || $this->usage($key) + $additional <= $limit;
+    }
+
+    /**
+     * @throws PlanLimitExceededException
+     */
+    public function assertCan(string $key, int $additional = 1): void
+    {
+        $limit = $this->limit($key);
+
+        if ($limit === null || $this->usage($key) + $additional <= $limit) {
+            return;
+        }
+
+        $labels = [
+            'animals' => 'animals',
+            'users' => 'users',
+            'milk_records_per_month' => 'milk records per month',
+            'alert_rules' => 'alert rules',
+        ];
+
+        throw new PlanLimitExceededException(
+            $key,
+            $limit,
+            'Your plan includes '.$limit.' '.($labels[$key] ?? $key).'. Upgrade your plan to add more.'
+        );
+    }
+
+    /**
+     * Switch the active tenant to a paid/included plan.
+     *
+     * @throws ValidationException
+     */
+    public function subscribe(string $planCode): Subscription
+    {
+        $tenant = $this->tenantContext->tenant();
+
+        if ($tenant === null) {
+            throw new RuntimeException('A tenant must be resolved before changing a subscription.');
+        }
+
+        return $this->subscribeForTenant($tenant, $planCode);
+    }
+
+    /**
+     * Used when a tenant is created outside the tenant middleware and its
+     * trialing subscription should start on a chosen plan.
+     *
+     * @throws ValidationException
+     */
+    public function subscribeForTenant(Tenant $tenant, string $planCode): Subscription
+    {
+        $plan = Plan::active()
+            ->whereRaw('LOWER(code) = ?', [mb_strtolower($planCode)])
+            ->first();
+
+        if ($plan === null) {
+            throw ValidationException::withMessages([
+                'plan_code' => 'The selected plan is invalid.',
+            ]);
+        }
+
+        $subscription = Subscription::withoutGlobalScopes()->firstOrNew(['tenant_id' => $tenant->id]);
+        $subscription->plan_id = $plan->id;
+        $subscription->status = 'active';
+        $subscription->ends_at = null;
+        $subscription->trial_ends_at = null;
+        $subscription->save();
+
+        return $subscription;
+    }
+
+    public function cancel(): Subscription
+    {
+        $subscription = $this->subscription();
+        $subscription->status = 'cancelled';
+        $subscription->ends_at = now();
+        $subscription->save();
+
+        return $subscription;
+    }
+
+    /**
+     * @return array{plan: Plan, subscription: Subscription, limits: array<string, mixed>, usage: array<string, int>, can_create: array<string, bool>}
+     */
+    public function summary(): array
+    {
+        $plan = $this->plan();
+        $limits = is_array($plan->limits) ? $plan->limits : [];
+
+        return [
+            'plan' => $plan,
+            'subscription' => $this->subscription(),
+            'limits' => $limits,
+            'usage' => collect(self::USAGE_KEYS)
+                ->mapWithKeys(fn (string $key): array => [$key => $this->usage($key)])
+                ->all(),
+            'can_create' => collect(self::USAGE_KEYS)
+                ->mapWithKeys(fn (string $key): array => [$key => $this->can($key)])
+                ->all(),
+        ];
+    }
+
+    private function subscriptionForTenantId(int $tenantId): Subscription
+    {
+        $subscription = Subscription::withoutGlobalScopes()->firstOrNew(['tenant_id' => $tenantId]);
+
+        if (! $subscription->exists) {
+            $subscription->plan_id = $this->starterPlan()->id;
+            $subscription->status = 'trialing';
+            $subscription->trial_ends_at = now()->addDays(14);
+            $subscription->ends_at = null;
+            $subscription->save();
+        }
+
+        return $subscription;
+    }
+
+    private function starterPlan(): Plan
+    {
+        return Plan::active()
+            ->whereRaw('LOWER(code) = ?', ['starter'])
+            ->first()
+            ?? Plan::active()->ordered()->firstOrFail();
+    }
+
+    private function subscriptionIsUsable(Subscription $subscription): bool
+    {
+        if (! in_array($subscription->status, ['active', 'trialing'], true)) {
+            return false;
+        }
+
+        if ($subscription->ends_at !== null && Carbon::parse($subscription->ends_at)->isPast()) {
+            return false;
+        }
+
+        if ($subscription->trial_ends_at !== null && Carbon::parse($subscription->trial_ends_at)->isPast()) {
+            return false;
+        }
+
+        return true;
+    }
+}

@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Tenancy\Models\Tenant;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LoginRequest;
+use App\Http\Resources\TenantResource;
 use App\Http\Resources\UserResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class AuthController extends Controller
 {
@@ -37,10 +40,14 @@ class AuthController extends Controller
             $expiration ? now()->addMinutes((int) $expiration) : null
         )->plainTextToken;
 
+        $tenantIds = DB::table('tenant_user')->where('user_id', $user->id)->pluck('tenant_id');
+        $tenants = Tenant::query()->whereIn('id', $tenantIds)->orderBy('name')->get();
+
         return response()->json([
             'data' => [
                 'token' => $token,
                 'user' => new UserResource($user),
+                'tenants' => TenantResource::collection($tenants),
             ],
         ]);
     }

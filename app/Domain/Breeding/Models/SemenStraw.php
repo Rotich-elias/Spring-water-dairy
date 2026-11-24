@@ -2,12 +2,14 @@
 
 namespace App\Domain\Breeding\Models;
 
+use App\Domain\Tenancy\Concerns\BelongsToTenant;
 use Database\Factories\SemenStrawFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class SemenStraw extends Model
 {
+    use BelongsToTenant;
     use HasFactory;
 
     protected $fillable = [

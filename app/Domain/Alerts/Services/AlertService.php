@@ -10,6 +10,7 @@ use App\Domain\Breeding\Models\Service;
 use App\Domain\Calves\Services\CalfGrowthService;
 use App\Domain\Health\Models\Vaccination;
 use App\Domain\Health\Services\WithholdingService;
+use App\Domain\Tenancy\TenantContext;
 use App\Models\Lookup;
 use App\Models\User;
 
@@ -468,8 +469,15 @@ class AlertService
      */
     protected function resolveRecipientsByRole(array $roles)
     {
+        $tenantId = app(TenantContext::class)->id();
+
+        if ($tenantId === null) {
+            return collect();
+        }
+
         return User::query()
             ->whereNull('deleted_at')
+            ->whereHas('tenants', fn ($query) => $query->whereKey($tenantId))
             ->whereHas('roles', function ($q) use ($roles) {
                 $q->whereIn('name', $roles);
             })

@@ -2,12 +2,14 @@
 
 namespace App\Domain\Alerts\Models;
 
+use App\Domain\Tenancy\Concerns\BelongsToTenant;
 use Database\Factories\AlertRuleFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class AlertRule extends Model
 {
+    use BelongsToTenant;
     use HasFactory;
 
     protected $fillable = [

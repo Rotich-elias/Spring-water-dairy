@@ -2,6 +2,7 @@
 
 namespace App\Domain\Milk\Models;
 
+use App\Domain\Tenancy\Concerns\BelongsToTenant;
 use Database\Factories\BulkTankRecordFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,6 +11,7 @@ use Illuminate\Support\Str;
 
 class BulkTankRecord extends Model
 {
+    use BelongsToTenant;
     use HasFactory;
     use SoftDeletes;
 
