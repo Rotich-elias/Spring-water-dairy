@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\AppearanceController;
 use App\Http\Controllers\Api\V1\AuditController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BillingController;
+use App\Http\Controllers\Api\V1\BillingPaymentsController;
 use App\Http\Controllers\Api\V1\BillingPlanRequestController;
 use App\Http\Controllers\Api\V1\BulkTankRecordsController;
 use App\Http\Controllers\Api\V1\CalfRecordsController;
@@ -30,6 +31,7 @@ use App\Http\Controllers\Api\V1\SellerController;
 use App\Http\Controllers\Api\V1\SellerFarmsController;
 use App\Http\Controllers\Api\V1\SellerImpersonationController;
 use App\Http\Controllers\Api\V1\SellerInquiryController;
+use App\Http\Controllers\Api\V1\SellerPaymentsController;
 use App\Http\Controllers\Api\V1\SellerPlanRequestsController;
 use App\Http\Controllers\Api\V1\SellerPlansController;
 use App\Http\Controllers\Api\V1\SellerSiteController;
@@ -113,6 +115,8 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::post('/plan-requests/{planRequest}/approve', [SellerPlanRequestsController::class, 'approve'])->name('plan-requests.approve');
             Route::post('/plan-requests/{planRequest}/reject', [SellerPlanRequestsController::class, 'reject'])->name('plan-requests.reject');
 
+            Route::get('/payments', [SellerPaymentsController::class, 'index'])->name('payments.index');
+
             Route::get('/farms', [SellerFarmsController::class, 'index'])->name('farms.index');
             Route::post('/farms', [SellerFarmsController::class, 'store'])->name('farms.store');
             Route::patch('/farms/{tenant}', [SellerFarmsController::class, 'update'])->name('farms.update');
@@ -137,6 +141,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::prefix('billing')->name('billing.')->group(function () {
                 Route::get('/', [BillingController::class, 'index'])->name('index');
                 Route::get('/usage', [BillingController::class, 'usage'])->name('usage');
+                Route::get('/payments', [BillingPaymentsController::class, 'index'])->name('payments.index');
                 Route::post('/plan-requests', [BillingPlanRequestController::class, 'store'])
                     ->middleware('throttle:10,1')
                     ->name('plan-requests.store');
