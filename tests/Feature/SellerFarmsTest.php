@@ -41,7 +41,8 @@ test('platform admin lists farms with owner, plan and usage data', function () {
     expect($farm)->not->toBeNull();
     expect($farm)->toHaveKeys([
         'id', 'name', 'slug', 'status', 'owner_id', 'owner_name', 'owner_email',
-        'plan_code', 'plan_name', 'subscription_status', 'usage', 'created_at',
+        'plan_code', 'plan_name', 'subscription_status', 'subscription_canceled_at',
+        'subscription_current_period_end', 'usage', 'created_at',
     ]);
     expect($farm['owner_email'])->toBe('usage-owner@example.com');
     expect($farm['plan_code'])->toBe('growth');
@@ -69,6 +70,8 @@ test('platform admin provisions a farm for a different owner and returns a tempo
 
     $owner = User::where('email', 'new-owner@example.com')->firstOrFail();
     expect(Hash::check($temporaryPassword, $owner->password))->toBeTrue();
+    expect($owner->hasRole('Owner', 'api'))->toBeTrue();
+    expect($owner->getAllPermissions()->pluck('name'))->toContain('billing.view');
 
     $tenantId = $response->json('data.id');
     $owner->refresh();
@@ -170,12 +173,14 @@ test('platform admin can assign and cancel a farm subscription', function () {
     $subscription = Subscription::where('tenant_id', $tenant->id)->firstOrFail();
     expect($subscription->plan->code)->toBe('growth');
 
-    $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
+    $cancel = $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
         ->postJson('/api/v1/seller/farms/'.$tenant->id.'/subscription/cancel')
         ->assertOk()
-        ->assertJsonPath('data.status', 'cancelled');
+        ->assertJsonPath('data.status', 'active');
 
-    expect($subscription->refresh()->status)->toBe('cancelled');
+    expect($cancel->json('data.canceled_at'))->not->toBeNull();
+    expect($subscription->refresh()->status)->toBe('active');
+    expect($subscription->canceled_at)->not->toBeNull();
 });
 
 test('platform admin cannot assign an inactive plan with 422', function () {

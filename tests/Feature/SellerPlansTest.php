@@ -68,20 +68,56 @@ test('platform admin updates a plan while keeping its code unique', function () 
     expect($plan->price_monthly)->toBe('8900.00');
 });
 
-test('platform admin deactivates a plan that has subscribers', function () {
+test('platform admin receives 422 when deactivating a plan that has subscribers', function () {
+    $plan = Plan::factory()->create(['code' => 'legacy-plan']);
+    Subscription::factory()->create(['plan_id' => $plan->id]);
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
+        ->patchJson('/api/v1/seller/plans/'.$plan->id, ['is_active' => false]);
+
+    $response->assertStatus(422)
+        ->assertJsonPath('error.code', 'validation_failed')
+        ->assertJsonPath('error.fields.is_active.0', "Move this plan's active subscribers to another plan before deactivating or removing it.");
+
+    expect($plan->refresh()->is_active)->toBeTrue();
+});
+
+test('platform admin receives 422 when deleting a plan that has subscribers', function () {
     $plan = Plan::factory()->create(['code' => 'legacy-plan']);
     Subscription::factory()->create(['plan_id' => $plan->id]);
 
     $response = $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
         ->deleteJson('/api/v1/seller/plans/'.$plan->id);
 
-    $response->assertOk()
-        ->assertJsonPath('data.is_active', false)
-        ->assertJsonPath('deactivated', true);
+    $response->assertStatus(422)
+        ->assertJsonPath('error.code', 'validation_failed');
 
-    $plan->refresh();
-    expect($plan->is_active)->toBeFalse();
     expect(Plan::where('code', 'legacy-plan')->exists())->toBeTrue();
+});
+
+test('platform admin receives 422 when removing the fallback starter plan', function () {
+    $plan = Plan::where('code', 'starter')->firstOrFail();
+
+    $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
+        ->patchJson('/api/v1/seller/plans/'.$plan->id, ['is_active' => false])
+        ->assertStatus(422)
+        ->assertJsonPath('error.fields.is_active.0', 'The fallback Starter plan cannot be deactivated or removed.');
+
+    $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
+        ->deleteJson('/api/v1/seller/plans/'.$plan->id)
+        ->assertStatus(422);
+
+    expect($plan->refresh()->is_active)->toBeTrue();
+});
+
+test('platform admin reactivates an inactive plan', function () {
+    $plan = Plan::factory()->create(['code' => 'revived-plan', 'is_active' => false]);
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
+        ->patchJson('/api/v1/seller/plans/'.$plan->id, ['is_active' => true]);
+
+    $response->assertOk()->assertJsonPath('data.is_active', true);
+    expect($plan->refresh()->is_active)->toBeTrue();
 });
 
 test('platform admin deletes an unused plan', function () {
@@ -93,6 +129,27 @@ test('platform admin deletes an unused plan', function () {
     $response->assertOk()->assertJsonPath('deactivated', false);
 
     expect(Plan::where('code', 'unused-plan')->exists())->toBeFalse();
+});
+
+test('platform admin deactivates a plan that only has historical subscriptions', function () {
+    $plan = Plan::factory()->create(['code' => 'retired-plan']);
+    Subscription::factory()->create([
+        'plan_id' => $plan->id,
+        'status' => 'cancelled',
+        'trial_ends_at' => null,
+        'ends_at' => now()->subDay(),
+        'current_period_end' => now()->subDay(),
+    ]);
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
+        ->deleteJson('/api/v1/seller/plans/'.$plan->id);
+
+    $response->assertOk()
+        ->assertJsonPath('data.is_active', false)
+        ->assertJsonPath('deactivated', true);
+
+    expect($plan->refresh()->is_active)->toBeFalse();
+    expect(Plan::where('code', 'retired-plan')->exists())->toBeTrue();
 });
 
 test('plan creation rejects a duplicate code with 422', function () {

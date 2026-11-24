@@ -9,7 +9,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\PlanStoreRequest;
 use App\Http\Requests\PlanUpdateRequest;
 use App\Http\Resources\PlanResource;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Validation\ValidationException;
 
 class SellerPlansController extends Controller
 {
@@ -53,7 +55,13 @@ class SellerPlansController extends Controller
     {
         $this->authorizePlatform('plans.update');
 
-        $plan->fill($request->validated());
+        $data = $request->validated();
+
+        if (($data['is_active'] ?? null) === false) {
+            $this->guardDeactivation($plan);
+        }
+
+        $plan->fill($data);
         $plan->save();
 
         return response()->json(['data' => new PlanResource($plan)]);
@@ -62,12 +70,11 @@ class SellerPlansController extends Controller
     public function destroy(Plan $plan): JsonResponse
     {
         $this->authorizePlatform('plans.delete');
+        $this->guardDeactivation($plan);
 
-        // Deleting a plan with subscribers would leave those subscriptions
-        // pointing at nothing, so it is deactivated instead.
-        $hasSubscriptions = Subscription::query()->where('plan_id', $plan->id)->exists();
-
-        if ($hasSubscriptions) {
+        // Historical subscriptions must still resolve their plan. Remove the
+        // plan only when nothing references it.
+        if ($this->hasSubscribers($plan)) {
             $plan->is_active = false;
             $plan->save();
 
@@ -83,6 +90,37 @@ class SellerPlansController extends Controller
             'data' => new PlanResource($plan),
             'deactivated' => false,
         ]);
+    }
+
+    private function guardDeactivation(Plan $plan): void
+    {
+        if ($plan->code === 'starter') {
+            throw ValidationException::withMessages([
+                'is_active' => 'The fallback Starter plan cannot be deactivated or removed.',
+            ]);
+        }
+
+        if ($this->hasActiveSubscribers($plan)) {
+            throw ValidationException::withMessages([
+                'is_active' => 'Move this plan\'s active subscribers to another plan before deactivating or removing it.',
+            ]);
+        }
+    }
+
+    private function hasActiveSubscribers(Plan $plan): bool
+    {
+        return Subscription::query()
+            ->where('plan_id', $plan->id)
+            ->whereIn('status', ['active', 'trialing'])
+            ->where(function (Builder $query): void {
+                $query->whereNull('ends_at')->orWhere('ends_at', '>=', now());
+            })
+            ->exists();
+    }
+
+    private function hasSubscribers(Plan $plan): bool
+    {
+        return Subscription::query()->where('plan_id', $plan->id)->exists();
     }
 
     private function authorizePlatform(string $ability): void

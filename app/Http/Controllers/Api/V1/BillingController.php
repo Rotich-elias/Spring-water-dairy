@@ -50,6 +50,7 @@ class BillingController extends Controller
         return response()->json([
             'data' => [
                 'plan' => new PlanResource($summary['plan']->setAttribute('current', true)),
+                'subscribed_plan' => new PlanResource($summary['subscribed_plan']),
                 'subscription' => new SubscriptionResource($summary['subscription']),
                 'limits' => $summary['limits'],
                 'usage' => $summary['usage'],

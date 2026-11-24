@@ -17,11 +17,15 @@ class Subscription extends Model
         'status',
         'trial_ends_at',
         'ends_at',
+        'canceled_at',
+        'current_period_end',
     ];
 
     protected $casts = [
         'trial_ends_at' => 'datetime',
         'ends_at' => 'datetime',
+        'canceled_at' => 'datetime',
+        'current_period_end' => 'datetime',
     ];
 
     public function tenant(): BelongsTo

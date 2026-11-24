@@ -60,6 +60,8 @@ class SellerFarmsController extends Controller
                     'plan_code' => $subscription?->plan?->code,
                     'plan_name' => $subscription?->plan?->name,
                     'subscription_status' => $subscription?->status,
+                    'subscription_canceled_at' => $subscription?->canceled_at?->toISOString(),
+                    'subscription_current_period_end' => $subscription?->current_period_end?->toISOString(),
                     'usage' => [
                         'animals' => $this->plans->usage('animals'),
                         'users' => $this->plans->usage('users'),
@@ -104,6 +106,11 @@ class SellerFarmsController extends Controller
                 'password' => Hash::make($temporaryPassword),
                 'role' => 'Owner',
             ]));
+
+            // The legacy role column is not enough: permissions come from
+            // Spatie, and a newly provisioned owner must be able to reach
+            // billing and the rest of the farm workspace immediately.
+            $owner->assignRole('Owner');
         }
 
         $tenant = $this->tenants->provisionFor($data, $owner);

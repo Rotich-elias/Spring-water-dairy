@@ -22,6 +22,8 @@ class SubscriptionFactory extends Factory
             'status' => 'trialing',
             'trial_ends_at' => now()->addDays(14),
             'ends_at' => null,
+            'canceled_at' => null,
+            'current_period_end' => now()->addDays(14),
         ];
     }
 }

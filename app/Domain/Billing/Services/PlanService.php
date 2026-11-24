@@ -151,32 +151,42 @@ class PlanService
         $subscription->status = 'active';
         $subscription->ends_at = null;
         $subscription->trial_ends_at = null;
-        $subscription->save();
-
-        return $subscription;
-    }
-
-    public function cancel(): Subscription
-    {
-        $subscription = $this->subscription();
-        $subscription->status = 'cancelled';
-        $subscription->ends_at = now();
+        $subscription->canceled_at = null;
+        $subscription->current_period_end = now()->addMonth();
         $subscription->save();
 
         return $subscription;
     }
 
     /**
-     * @return array{plan: Plan, subscription: Subscription, limits: array<string, mixed>, usage: array<string, int>, can_create: array<string, bool>}
+     * Schedule cancellation at the end of the current period. The farm keeps
+     * its plan limits until that date, then falls back to the starter plan.
+     */
+    public function cancel(): Subscription
+    {
+        $subscription = $this->subscription();
+
+        if ($subscription->canceled_at === null && $this->subscriptionIsUsable($subscription)) {
+            $subscription->canceled_at = now();
+            $subscription->save();
+        }
+
+        return $subscription;
+    }
+
+    /**
+     * @return array{plan: Plan, subscribed_plan: Plan, subscription: Subscription, limits: array<string, mixed>, usage: array<string, int>, can_create: array<string, bool>}
      */
     public function summary(): array
     {
+        $subscription = $this->subscription();
         $plan = $this->plan();
         $limits = is_array($plan->limits) ? $plan->limits : [];
 
         return [
             'plan' => $plan,
-            'subscription' => $this->subscription(),
+            'subscribed_plan' => $subscription->plan ?? $plan,
+            'subscription' => $subscription,
             'limits' => $limits,
             'usage' => collect(self::USAGE_KEYS)
                 ->mapWithKeys(fn (string $key): array => [$key => $this->usage($key)])
@@ -196,8 +206,35 @@ class PlanService
             $subscription->status = 'trialing';
             $subscription->trial_ends_at = now()->addDays(14);
             $subscription->ends_at = null;
+            $subscription->canceled_at = null;
+            $subscription->current_period_end = $subscription->trial_ends_at;
             $subscription->save();
+
+            return $subscription;
         }
+
+        return $this->finalizeExpired($subscription);
+    }
+
+    /**
+     * Close a period that has already elapsed so status, billing responses and
+     * plan limits all agree without a scheduler.
+     */
+    private function finalizeExpired(Subscription $subscription): Subscription
+    {
+        if (! in_array($subscription->status, ['active', 'trialing'], true)) {
+            return $subscription;
+        }
+
+        $periodEnd = $subscription->current_period_end ?? $subscription->trial_ends_at;
+
+        if ($periodEnd === null || Carbon::parse($periodEnd)->isFuture()) {
+            return $subscription;
+        }
+
+        $subscription->status = $subscription->canceled_at !== null ? 'cancelled' : 'expired';
+        $subscription->ends_at = Carbon::parse($periodEnd);
+        $subscription->save();
 
         return $subscription;
     }
@@ -221,6 +258,10 @@ class PlanService
         }
 
         if ($subscription->trial_ends_at !== null && Carbon::parse($subscription->trial_ends_at)->isPast()) {
+            return false;
+        }
+
+        if ($subscription->current_period_end !== null && Carbon::parse($subscription->current_period_end)->isPast()) {
             return false;
         }
 

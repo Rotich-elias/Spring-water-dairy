@@ -5,6 +5,7 @@ use App\Domain\Billing\Services\PlanService;
 use App\Domain\Tenancy\Models\Plan;
 use App\Domain\Tenancy\Services\TenantService;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
@@ -66,6 +67,83 @@ test('subscribing to growth raises the plan limits', function () {
     expect($response->json('data.limits.animals'))->toBe(500);
 
     expect(app(PlanService::class)->limit('animals'))->toBe(500);
+});
+
+test('cancelling keeps the current plan until the period ends', function () {
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->postJson('/api/v1/billing/subscribe', ['plan_code' => 'growth'])
+        ->assertOk();
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->postJson('/api/v1/billing/cancel')
+        ->assertOk();
+
+    expect($response->json('data.subscription.status'))->toBe('active');
+    expect($response->json('data.subscription.canceled_at'))->not->toBeNull();
+    expect($response->json('data.subscription.ends_at'))->toBeNull();
+    expect($response->json('data.plan.code'))->toBe('growth');
+    expect($response->json('data.limits.animals'))->toBe(500);
+
+    $periodEnd = Carbon::parse($response->json('data.subscription.current_period_end'));
+    $this->travelTo($periodEnd->copy()->addDay());
+
+    try {
+        $after = $this->withHeader('Authorization', 'Bearer '.$this->token)
+            ->getJson('/api/v1/billing')
+            ->assertOk();
+
+        expect($after->json('data.plan.code'))->toBe('starter');
+        expect($after->json('data.subscription.status'))->toBe('cancelled');
+        expect($after->json('data.subscription.ends_at'))->not->toBeNull();
+    } finally {
+        $this->travelBack();
+    }
+});
+
+test('subscribing clears a scheduled cancellation', function () {
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->postJson('/api/v1/billing/subscribe', ['plan_code' => 'growth'])
+        ->assertOk();
+
+    $cancelled = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->postJson('/api/v1/billing/cancel')
+        ->assertOk();
+
+    expect($cancelled->json('data.subscription.canceled_at'))->not->toBeNull();
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->postJson('/api/v1/billing/subscribe', ['plan_code' => 'starter'])
+        ->assertOk();
+
+    expect($response->json('data.subscription.canceled_at'))->toBeNull();
+    expect($response->json('data.subscription.status'))->toBe('active');
+    expect($response->json('data.subscription.ends_at'))->toBeNull();
+    expect($response->json('data.plan.code'))->toBe('starter');
+});
+
+test('billing usage mirrors the current summary', function () {
+    $summary = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->getJson('/api/v1/billing')
+        ->assertOk()
+        ->json('data');
+
+    $usage = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->getJson('/api/v1/billing/usage')
+        ->assertOk()
+        ->json('data');
+
+    expect($usage['usage'])->toBe($summary['usage']);
+    expect($usage['can_create'])->toBe($summary['can_create']);
+    expect($usage['plan']['code'])->toBe($summary['plan']['code']);
+});
+
+test('subscribing to a deactivated plan returns 422', function () {
+    $plan = Plan::factory()->create(['code' => 'retired-plan', 'is_active' => false]);
+
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->postJson('/api/v1/billing/subscribe', ['plan_code' => $plan->code])
+        ->assertStatus(422)
+        ->assertJsonPath('error.fields.plan_code.0', 'The selected plan is invalid.');
 });
 
 test('a user without billing permission cannot subscribe', function () {
