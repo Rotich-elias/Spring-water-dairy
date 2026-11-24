@@ -28,6 +28,7 @@ class PlanStoreRequest extends FormRequest
             'name' => ['required', 'string', 'max:120'],
             'description' => ['nullable', 'string', 'max:1000'],
             'price_monthly' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'provider_price_id' => ['sometimes', 'nullable', 'string', 'max:120'],
             'limits' => ['sometimes', 'array'],
             'limits.*' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['sometimes', 'boolean'],

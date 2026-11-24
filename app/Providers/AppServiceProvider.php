@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Domain\Billing\Contracts\PaymentGateway;
+use App\Domain\Billing\Gateways\PaystackGateway;
 use App\Domain\Tenancy\TenantContext;
 use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -19,6 +21,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(TenantContext::class);
+        $this->app->bind(PaymentGateway::class, PaystackGateway::class);
     }
 
     /**

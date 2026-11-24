@@ -4,23 +4,31 @@ namespace App\Domain\Billing\Services;
 
 use App\Domain\Alerts\Models\AlertRule;
 use App\Domain\Animals\Models\Animal;
+use App\Domain\Billing\Contracts\PaymentGateway;
 use App\Domain\Billing\Exceptions\PlanLimitExceededException;
+use App\Domain\Billing\Models\CheckoutSession;
+use App\Domain\Billing\Models\Payment;
 use App\Domain\Milk\Models\MilkRecord;
 use App\Domain\Tenancy\Models\Plan;
 use App\Domain\Tenancy\Models\Subscription;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
 use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
+use Throwable;
 
 class PlanService
 {
     /** @var list<string> */
     public const USAGE_KEYS = ['animals', 'users', 'milk_records_per_month', 'alert_rules'];
 
-    public function __construct(private TenantContext $tenantContext) {}
+    public function __construct(
+        private TenantContext $tenantContext,
+        private PaymentGateway $payments,
+    ) {}
 
     /**
      * Get (or lazily create) the trialing subscription for the active tenant.
@@ -115,6 +123,9 @@ class PlanService
     /**
      * Switch the active tenant to a paid/included plan.
      *
+     * This remains available for internal provisioning and free-plan changes.
+     * Paid upgrades from the farm UI go through hosted checkout instead.
+     *
      * @throws ValidationException
      */
     public function subscribe(string $planCode): Subscription
@@ -153,6 +164,111 @@ class PlanService
         $subscription->trial_ends_at = null;
         $subscription->canceled_at = null;
         $subscription->current_period_end = now()->addMonth();
+        $subscription->provider = null;
+        $subscription->provider_customer_id = null;
+        $subscription->provider_subscription_id = null;
+        $subscription->provider_email_token = null;
+        $subscription->provider_plan_code = null;
+        $subscription->payment_status = 'none';
+        $subscription->last_payment_at = null;
+        $subscription->save();
+
+        return $subscription;
+    }
+
+    /**
+     * Activate a plan after the payment provider confirms a successful charge.
+     *
+     * @param  array<string, string|null>  $provider
+     */
+    public function activatePaidPlan(
+        Tenant $tenant,
+        Plan $plan,
+        ?CarbonInterface $periodEnd = null,
+        array $provider = [],
+    ): Subscription {
+        $subscription = $this->subscriptionForTenantId($tenant->id);
+        $subscription->plan_id = $plan->id;
+        $subscription->status = 'active';
+        $subscription->ends_at = null;
+        $subscription->trial_ends_at = null;
+        $subscription->canceled_at = null;
+        $subscription->current_period_end = $periodEnd ?? now()->addMonth();
+        $subscription->payment_status = 'paid';
+        $subscription->last_payment_at = now();
+        $subscription->provider = $this->payments->name();
+
+        foreach ($provider as $key => $value) {
+            if (in_array($key, [
+                'provider_customer_id',
+                'provider_subscription_id',
+                'provider_email_token',
+                'provider_plan_code',
+            ], true) && $value !== null && $value !== '') {
+                $subscription->{$key} = $value;
+            }
+        }
+
+        $subscription->save();
+
+        return $subscription->load('plan');
+    }
+
+    /**
+     * Link provider identifiers from a subscription.create webhook without
+     * changing the locally active plan.
+     *
+     * @param  array<string, string|null>  $provider
+     */
+    public function linkProviderSubscription(Tenant $tenant, array $provider): Subscription
+    {
+        $subscription = $this->subscriptionForTenantId($tenant->id);
+        $subscription->provider = $this->payments->name();
+
+        foreach ($provider as $key => $value) {
+            if (in_array($key, [
+                'provider_customer_id',
+                'provider_subscription_id',
+                'provider_email_token',
+                'provider_plan_code',
+            ], true) && $value !== null && $value !== '') {
+                $subscription->{$key} = $value;
+            }
+        }
+
+        $subscription->save();
+
+        return $subscription;
+    }
+
+    /**
+     * A failed renewal keeps access until the period ends, then the normal
+     * expiry rules move the farm to Starter.
+     */
+    public function markPaymentFailed(Tenant $tenant, ?CarbonInterface $periodEnd = null): Subscription
+    {
+        $subscription = $this->subscriptionForTenantId($tenant->id);
+        $subscription->payment_status = 'past_due';
+
+        if ($periodEnd !== null && $periodEnd->isFuture()) {
+            $subscription->current_period_end = $periodEnd;
+        }
+
+        $subscription->save();
+
+        return $subscription;
+    }
+
+    public function recordRenewalPayment(Tenant $tenant, ?CarbonInterface $periodEnd = null): Subscription
+    {
+        $subscription = $this->subscriptionForTenantId($tenant->id);
+        $subscription->payment_status = 'paid';
+        $subscription->last_payment_at = now();
+
+        if ($periodEnd !== null && $periodEnd->isFuture()) {
+            $subscription->current_period_end = $periodEnd;
+        }
+
         $subscription->save();
 
         return $subscription;
@@ -164,18 +280,33 @@ class PlanService
      */
     public function cancel(): Subscription
     {
-        $subscription = $this->subscription();
+        $tenant = $this->tenantContext->tenant();
+
+        if ($tenant === null) {
+            throw new RuntimeException('A tenant must be resolved before cancelling a subscription.');
+        }
+
+        return $this->cancelForTenant($tenant);
+    }
+
+    public function cancelForTenant(Tenant $tenant, bool $notifyProvider = true): Subscription
+    {
+        $subscription = $this->subscriptionForTenantId($tenant->id);
 
         if ($subscription->canceled_at === null && $this->subscriptionIsUsable($subscription)) {
             $subscription->canceled_at = now();
             $subscription->save();
+
+            if ($notifyProvider) {
+                $this->disableProviderSubscription($subscription);
+            }
         }
 
         return $subscription;
     }
 
     /**
-     * @return array{plan: Plan, subscribed_plan: Plan, subscription: Subscription, limits: array<string, mixed>, usage: array<string, int>, can_create: array<string, bool>}
+     * @return array{plan: Plan, subscribed_plan: Plan, subscription: Subscription, limits: array<string, mixed>, usage: array<string, int>, can_create: array<string, bool>, pending_checkout: CheckoutSession|null, last_payment: Payment|null}
      */
     public function summary(): array
     {
@@ -194,10 +325,12 @@ class PlanService
             'can_create' => collect(self::USAGE_KEYS)
                 ->mapWithKeys(fn (string $key): array => [$key => $this->can($key)])
                 ->all(),
+            'pending_checkout' => $this->pendingCheckout($subscription->tenant_id),
+            'last_payment' => $this->lastPayment($subscription->tenant_id),
         ];
     }
 
-    private function subscriptionForTenantId(int $tenantId): Subscription
+    public function subscriptionForTenantId(int $tenantId): Subscription
     {
         $subscription = Subscription::withoutGlobalScopes()->firstOrNew(['tenant_id' => $tenantId]);
 
@@ -208,6 +341,7 @@ class PlanService
             $subscription->ends_at = null;
             $subscription->canceled_at = null;
             $subscription->current_period_end = $subscription->trial_ends_at;
+            $subscription->payment_status = 'none';
             $subscription->save();
 
             return $subscription;
@@ -266,5 +400,47 @@ class PlanService
         }
 
         return true;
+    }
+
+    private function disableProviderSubscription(Subscription $subscription): void
+    {
+        $code = $subscription->provider_subscription_id;
+
+        if ($code === null || $code === '') {
+            return;
+        }
+
+        try {
+            $this->payments->disableSubscription($code, $subscription->provider_email_token);
+        } catch (Throwable $e) {
+            report($e);
+        }
+    }
+
+    private function pendingCheckout(int $tenantId): ?CheckoutSession
+    {
+        CheckoutSession::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('status', CheckoutSession::STATUS_PENDING)
+            ->where('expires_at', '<', now())
+            ->update(['status' => CheckoutSession::STATUS_EXPIRED]);
+
+        return CheckoutSession::withoutGlobalScopes()
+            ->with('plan')
+            ->where('tenant_id', $tenantId)
+            ->where('status', CheckoutSession::STATUS_PENDING)
+            ->where(function ($query): void {
+                $query->whereNull('expires_at')->orWhere('expires_at', '>=', now());
+            })
+            ->latest()
+            ->first();
+    }
+
+    private function lastPayment(int $tenantId): ?Payment
+    {
+        return Payment::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->latest()
+            ->first();
     }
 }

@@ -43,6 +43,7 @@ use App\Http\Controllers\Api\V1\TenantsController;
 use App\Http\Controllers\Api\V1\TreatmentsController;
 use App\Http\Controllers\Api\V1\UsersController;
 use App\Http\Controllers\Api\V1\VaccinationsController;
+use App\Http\Controllers\Api\V1\WebhookController;
 use App\Http\Controllers\Api\V1\WeightsController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -58,6 +59,11 @@ Route::aliasMiddleware('optional.auth', function (Request $request, Closure $nex
 
 // All Phase 1 endpoints live under /api/v1.
 Route::prefix('v1')->name('api.v1.')->group(function () {
+
+    // Signed payment events must be accepted without a user session or a
+    // resolved farm; the webhook payload carries its own tenant context.
+    Route::post('/webhooks/paystack', [WebhookController::class, 'paystack'])
+        ->name('webhooks.paystack');
 
     Route::middleware('throttle:login')->group(function () {
         Route::post('/auth/login', [AuthController::class, 'login']);
@@ -123,6 +129,9 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::prefix('billing')->name('billing.')->group(function () {
                 Route::get('/', [BillingController::class, 'index'])->name('index');
                 Route::get('/usage', [BillingController::class, 'usage'])->name('usage');
+                Route::post('/checkout', [BillingController::class, 'checkout'])
+                    ->middleware('throttle:10,1')
+                    ->name('checkout');
                 Route::post('/subscribe', [BillingController::class, 'subscribe'])->name('subscribe');
                 Route::post('/cancel', [BillingController::class, 'cancel'])->name('cancel');
             });
