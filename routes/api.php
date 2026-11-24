@@ -37,8 +37,16 @@ use App\Http\Controllers\Api\V1\UsersController;
 use App\Http\Controllers\Api\V1\VaccinationsController;
 use App\Http\Controllers\Api\V1\WeightsController;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
+
+// Resolve a token when one is present without rejecting guest requests.
+Route::aliasMiddleware('optional.auth', function (Request $request, Closure $next) {
+    Auth::shouldUse('sanctum');
+
+    return $next($request);
+});
 
 // All Phase 1 endpoints live under /api/v1.
 Route::prefix('v1')->name('api.v1.')->group(function () {
@@ -47,11 +55,18 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::post('/auth/login', [AuthController::class, 'login']);
     });
 
+    // Pricing is public so the pre-login landing page can display the plans.
+    // The optional auth middleware keeps the current plan accurate for users
+    // who are signed in.
+    Route::middleware('optional.auth')->group(function () {
+        Route::get('/plans', [PlansController::class, 'index'])->name('plans.index');
+    });
+
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/auth/logout', [AuthController::class, 'logout']);
         Route::get('/auth/me', [AuthController::class, 'me']);
 
-        // Tenant management and plan discovery must work before a tenant is resolved.
+        // Tenant management must work before a tenant is resolved.
         Route::prefix('tenants')->name('tenants.')->group(function () {
             Route::get('/', [TenantsController::class, 'index'])->name('index');
             Route::post('/', [TenantsController::class, 'store'])->name('store');
@@ -59,8 +74,6 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::patch('/{tenant}', [TenantsController::class, 'update'])->name('update');
             Route::post('/{tenant}/switch', [TenantsController::class, 'switch'])->name('switch');
         });
-
-        Route::get('/plans', [PlansController::class, 'index'])->name('plans.index');
 
         Route::middleware('tenant')->group(function () {
             Route::prefix('billing')->name('billing.')->group(function () {
