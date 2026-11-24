@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Billing\Services\PlanRequestService;
 use App\Domain\Billing\Services\PlanService;
 use App\Domain\Milk\Models\MilkRecord;
+use App\Domain\Tenancy\Models\Plan;
 use App\Domain\Tenancy\Models\Subscription;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\Services\TenantService;
@@ -14,8 +16,10 @@ use App\Http\Requests\FarmUpdateRequest;
 use App\Http\Requests\SubscriptionAssignRequest;
 use App\Http\Resources\SubscriptionResource;
 use App\Http\Resources\TenantResource;
+use App\Models\AuditLog;
 use App\Models\Impersonation;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -27,6 +31,7 @@ class SellerFarmsController extends Controller
     public function __construct(
         private TenantService $tenants,
         private PlanService $plans,
+        private PlanRequestService $planRequests,
         private TenantContext $context,
     ) {}
 
@@ -89,43 +94,88 @@ class SellerFarmsController extends Controller
         $this->authorizePlatform('farms.provision');
 
         $data = $request->validated();
-        $owner = User::query()
+        $adminId = (int) $request->user()->id;
+        $temporaryPassword = Str::password(16);
+
+        $existingOwner = User::query()
             ->whereRaw('LOWER(email) = ?', [mb_strtolower($data['owner_email'])])
             ->first();
+        $ownerExisted = $existingOwner !== null;
 
-        $temporaryPassword = null;
+        $tenant = DB::transaction(function () use (
+            $data,
+            $adminId,
+            $temporaryPassword,
+            $existingOwner,
+            $ownerExisted,
+        ): Tenant {
+            $owner = $existingOwner;
 
-        if ($owner === null) {
-            $temporaryPassword = Str::password(16);
-
-            // Provisioning happens outside a farm context, so the usual
-            // tenant-scoped user audit event cannot run here.
-            $owner = User::withoutEvents(fn (): User => User::create([
-                'name' => Str::headline(Str::before($data['owner_email'], '@')),
-                'email' => $data['owner_email'],
-                'password' => Hash::make($temporaryPassword),
-                'role' => 'Owner',
-            ]));
+            if ($owner === null) {
+                // Provisioning happens outside a farm context, so the usual
+                // tenant-scoped user audit event cannot run here.
+                $owner = User::withoutEvents(fn (): User => User::create([
+                    'name' => Str::headline(Str::before($data['owner_email'], '@')),
+                    'email' => $data['owner_email'],
+                    'password' => Hash::make($temporaryPassword),
+                    'role' => 'Owner',
+                ]));
+            } else {
+                User::withoutEvents(function () use ($owner, $temporaryPassword): void {
+                    $owner->forceFill(['password' => Hash::make($temporaryPassword)])->save();
+                });
+                $owner->tokens()->delete();
+            }
 
             // The legacy role column is not enough: permissions come from
-            // Spatie, and a newly provisioned owner must be able to reach
-            // billing and the rest of the farm workspace immediately.
+            // Spatie, and every provisioned owner must be able to reach billing
+            // and the rest of the farm workspace immediately.
             $owner->assignRole('Owner');
-        }
 
-        $tenant = $this->tenants->provisionFor($data, $owner);
+            $tenant = $this->tenants->provisionFor($data, $owner);
 
-        if (isset($data['plan_code'])) {
-            $this->plans->subscribeForTenant($tenant, $data['plan_code']);
-        }
+            if (isset($data['plan_code'])) {
+                $plan = Plan::active()
+                    ->whereRaw('LOWER(code) = ?', [mb_strtolower($data['plan_code'])])
+                    ->firstOrFail();
 
-        $response = ['data' => new TenantResource($tenant->setAttribute('current', false))];
+                if ((float) $plan->price_monthly > 0) {
+                    $planRequest = $this->planRequests->create(
+                        $tenant->id,
+                        $adminId,
+                        $plan->code,
+                        'Initial paid plan provisioning.',
+                    );
 
-        if ($temporaryPassword !== null) {
-            $response['temporary_password'] = $temporaryPassword;
-        }
+                    $this->planRequests->issueInvoice($planRequest->id, $adminId);
+                    $this->planRequests->markPaid(
+                        $planRequest->id,
+                        $adminId,
+                        $data['payment_reference'],
+                        Carbon::parse($data['payment_date']),
+                    );
+                    $this->planRequests->approve($planRequest->id, $adminId);
+                } else {
+                    $this->plans->subscribeForTenant($tenant, $plan->code);
+                }
+            }
 
-        return response()->json($response, 201);
+            $this->auditOwnerAction(
+                $tenant,
+                $owner,
+                $ownerExisted ? 'farm.owner_password_reset' : 'farm.owner_created',
+                $adminId,
+            );
+
+            return $tenant;
+        });
+
+        $farm = (new TenantResource($tenant->setAttribute('current', false)))->resolve($request);
+        $farm['owner_email'] = $data['owner_email'];
+        $farm['existing_owner'] = $ownerExisted;
+        $farm['temporary_password'] = $temporaryPassword;
+
+        return response()->json(['data' => $farm], 201);
     }
 
     public function update(FarmUpdateRequest $request, Tenant $tenant): JsonResponse
@@ -199,6 +249,31 @@ class SellerFarmsController extends Controller
         ]);
     }
 
+    public function resetOwnerPassword(Tenant $tenant): JsonResponse
+    {
+        $this->authorizePlatform('farms.password_reset');
+
+        $adminId = (int) auth()->id();
+        $owner = User::query()->whereKey($tenant->owner_id)->firstOrFail();
+        $temporaryPassword = Str::password(16);
+
+        DB::transaction(function () use ($owner, $temporaryPassword): void {
+            User::withoutEvents(function () use ($owner, $temporaryPassword): void {
+                $owner->forceFill(['password' => Hash::make($temporaryPassword)])->save();
+            });
+            $owner->tokens()->delete();
+        });
+
+        $this->auditOwnerAction($tenant, $owner, 'farm.owner_password_reset', $adminId);
+
+        return response()->json(['data' => [
+            'owner_id' => $owner->id,
+            'owner_email' => $owner->email,
+            'temporary_password' => $temporaryPassword,
+            'reset_at' => now()->toISOString(),
+        ]]);
+    }
+
     public function cancel(Tenant $tenant): JsonResponse
     {
         $this->authorizePlatform('subscriptions.manage');
@@ -218,6 +293,21 @@ class SellerFarmsController extends Controller
 
         return response()->json([
             'data' => new SubscriptionResource($subscription->load('plan')),
+        ]);
+    }
+
+    private function auditOwnerAction(Tenant $tenant, User $owner, string $action, int $adminId): void
+    {
+        AuditLog::forceCreate([
+            'tenant_id' => $tenant->id,
+            'auditable_type' => User::class,
+            'auditable_id' => $owner->id,
+            'user_id' => $adminId,
+            'action' => $action,
+            'new_values' => ['farm_id' => $tenant->id, 'owner_email' => $owner->email],
+            'overrides' => ['tenant_id' => $tenant->id],
+            'ip_address' => request()->ip(),
+            'device' => request()->header('User-Agent'),
         ]);
     }
 

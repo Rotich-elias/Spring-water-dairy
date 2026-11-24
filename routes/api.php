@@ -119,6 +119,9 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::delete('/farms/{tenant}', [SellerFarmsController::class, 'destroy'])->name('farms.destroy');
             Route::post('/farms/{tenant}/subscription', [SellerFarmsController::class, 'subscribe'])->name('farms.subscribe');
             Route::post('/farms/{tenant}/subscription/cancel', [SellerFarmsController::class, 'cancel'])->name('farms.cancel');
+            Route::post('/farms/{tenant}/owner/reset-password', [SellerFarmsController::class, 'resetOwnerPassword'])
+                ->middleware('throttle:10,1')
+                ->name('farms.reset-owner-password');
             Route::post('/farms/{tenant}/impersonate', [SellerImpersonationController::class, 'store'])->name('impersonations.store');
 
             Route::get('/impersonations', [SellerImpersonationController::class, 'index'])->name('impersonations.index');

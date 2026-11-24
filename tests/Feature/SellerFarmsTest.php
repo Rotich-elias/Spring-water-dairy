@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Animals\Models\Animal;
+use App\Domain\Billing\Models\PlanChangeRequest;
 use App\Domain\Tenancy\Models\Plan;
 use App\Domain\Tenancy\Models\Subscription;
 use App\Domain\Tenancy\Models\Tenant;
@@ -9,6 +10,7 @@ use App\Models\Impersonation;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Role;
 
 beforeEach(function () {
     $this->adminToken = $this->authenticateAsPlatformAdmin();
@@ -22,6 +24,8 @@ test('platform admin lists farms with owner, plan and usage data', function () {
             'slug' => 'usage-farm',
             'owner_email' => 'usage-owner@example.com',
             'plan_code' => 'growth',
+            'payment_reference' => 'USAGE-INVOICE-1',
+            'payment_date' => '2026-11-20',
         ]);
 
     $provision->assertStatus(201);
@@ -63,15 +67,22 @@ test('platform admin provisions a farm for a different owner and returns a tempo
 
     $response->assertStatus(201)
         ->assertJsonPath('data.name', 'New Branch')
-        ->assertJsonPath('data.slug', 'new-branch');
+        ->assertJsonPath('data.slug', 'new-branch')
+        ->assertJsonPath('data.owner_email', 'new-owner@example.com')
+        ->assertJsonPath('data.existing_owner', false);
 
-    $temporaryPassword = $response->json('temporary_password');
+    $temporaryPassword = $response->json('data.temporary_password');
     expect($temporaryPassword)->toBeString()->not->toBeEmpty();
 
     $owner = User::where('email', 'new-owner@example.com')->firstOrFail();
     expect(Hash::check($temporaryPassword, $owner->password))->toBeTrue();
     expect($owner->hasRole('Owner', 'api'))->toBeTrue();
     expect($owner->getAllPermissions()->pluck('name'))->toContain('billing.view');
+    $this->assertDatabaseHas('audit_logs', [
+        'action' => 'farm.owner_created',
+        'auditable_type' => User::class,
+        'auditable_id' => $owner->id,
+    ]);
 
     $tenantId = $response->json('data.id');
     $owner->refresh();
@@ -93,8 +104,12 @@ test('platform admin provisions a farm for a different owner and returns a tempo
         ->exists())->toBeFalse();
 });
 
-test('platform admin provisions a farm for an existing owner without revealing a password', function () {
-    $owner = User::factory()->create(['email' => 'existing-owner@example.com']);
+test('platform admin provisions a farm for an existing owner and returns a rotated password', function () {
+    $owner = User::factory()->create([
+        'email' => 'existing-owner@example.com',
+        'password' => Hash::make('old-password'),
+    ]);
+    $owner->createToken('previous-session');
 
     $response = $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
         ->postJson('/api/v1/seller/farms', [
@@ -102,13 +117,150 @@ test('platform admin provisions a farm for an existing owner without revealing a
             'owner_email' => $owner->email,
         ]);
 
-    $response->assertStatus(201)->assertJsonMissingPath('temporary_password');
+    $response->assertStatus(201)
+        ->assertJsonPath('data.owner_email', $owner->email)
+        ->assertJsonPath('data.existing_owner', true);
+
+    $temporaryPassword = $response->json('data.temporary_password');
+    expect($temporaryPassword)->toBeString()->not->toBeEmpty();
+
+    $owner->refresh();
+    expect(Hash::check($temporaryPassword, $owner->password))->toBeTrue()
+        ->and(Hash::check('old-password', $owner->password))->toBeFalse()
+        ->and($owner->tokens()->count())->toBe(0);
+
+    $this->assertDatabaseHas('audit_logs', [
+        'action' => 'farm.owner_password_reset',
+        'auditable_type' => User::class,
+        'auditable_id' => $owner->id,
+    ]);
 
     $tenantId = $response->json('data.id');
     expect(DB::table('tenant_user')
         ->where('tenant_id', $tenantId)
         ->where('user_id', $owner->id)
         ->exists())->toBeTrue();
+});
+
+test('paid farm provisioning records payment and creates an approved invoice request', function () {
+    $this->travelTo('2026-11-20 10:00:00');
+
+    try {
+        $response = $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
+            ->postJson('/api/v1/seller/farms', [
+                'name' => 'Paid Branch',
+                'slug' => 'paid-branch',
+                'owner_email' => 'paid-owner@example.com',
+                'plan_code' => 'growth',
+                'payment_reference' => 'PAY-REF-123',
+                'payment_date' => '2026-11-18',
+            ])
+            ->assertStatus(201);
+
+        $tenantId = $response->json('data.id');
+        $request = PlanChangeRequest::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->firstOrFail();
+
+        expect($request->status)->toBe('approved')
+            ->and($request->plan_code)->toBe('growth')
+            ->and($request->invoice_number)->toBe('INV-2026-'.str_pad((string) $request->id, 5, '0', STR_PAD_LEFT))
+            ->and($request->payment_reference)->toBe('PAY-REF-123')
+            ->and($request->payment_date->toDateString())->toBe('2026-11-18');
+
+        $subscription = Subscription::withoutGlobalScopes()->where('tenant_id', $tenantId)->firstOrFail();
+        expect($subscription->plan->code)->toBe('growth')
+            ->and($subscription->payment_status)->toBe('paid')
+            ->and($subscription->last_payment_at->toDateString())->toBe('2026-11-18')
+            ->and($subscription->current_period_end->toDateString())->toBe('2026-12-18');
+
+        foreach ([
+            'plan_request.requested',
+            'plan_request.invoiced',
+            'plan_request.payment_recorded',
+            'plan_request.approved',
+        ] as $action) {
+            $this->assertDatabaseHas('audit_logs', [
+                'action' => $action,
+                'auditable_type' => PlanChangeRequest::class,
+                'auditable_id' => $request->id,
+            ]);
+        }
+    } finally {
+        $this->travelBack();
+    }
+});
+
+test('paid farm provisioning requires payment reference and date', function () {
+    $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
+        ->postJson('/api/v1/seller/farms', [
+            'name' => 'Unpaid Branch',
+            'slug' => 'unpaid-branch',
+            'owner_email' => 'unpaid-owner@example.com',
+            'plan_code' => 'growth',
+        ])
+        ->assertStatus(422)
+        ->assertJsonPath('error.fields.payment_reference.0', 'A payment reference is required for a paid plan.')
+        ->assertJsonPath('error.fields.payment_date.0', 'A payment date is required for a paid plan.');
+
+    expect(Tenant::where('slug', 'unpaid-branch')->exists())->toBeFalse();
+});
+
+test('free farm provisioning does not require payment details', function () {
+    $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
+        ->postJson('/api/v1/seller/farms', [
+            'name' => 'Free Branch',
+            'slug' => 'free-branch',
+            'owner_email' => 'free-owner@example.com',
+            'plan_code' => 'starter',
+        ])
+        ->assertStatus(201)
+        ->assertJsonPath('data.owner_email', 'free-owner@example.com');
+
+    $tenant = Tenant::where('slug', 'free-branch')->firstOrFail();
+    expect(PlanChangeRequest::withoutGlobalScopes()->where('tenant_id', $tenant->id)->exists())->toBeFalse();
+});
+
+test('platform admin resets a farm owner password without sending email', function () {
+    $owner = User::factory()->create([
+        'email' => 'reset-owner@example.com',
+        'password' => Hash::make('old-password'),
+    ]);
+    $owner->createToken('existing-session');
+    $tenant = Tenant::factory()->create(['owner_id' => $owner->id]);
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
+        ->postJson('/api/v1/seller/farms/'.$tenant->id.'/owner/reset-password')
+        ->assertOk()
+        ->assertJsonPath('data.owner_id', $owner->id)
+        ->assertJsonPath('data.owner_email', $owner->email);
+
+    $newPassword = $response->json('data.temporary_password');
+    expect($newPassword)->toBeString()->not->toBeEmpty();
+
+    $owner->refresh();
+    expect(Hash::check($newPassword, $owner->password))->toBeTrue()
+        ->and(Hash::check('old-password', $owner->password))->toBeFalse()
+        ->and($owner->tokens()->count())->toBe(0);
+
+    $this->assertDatabaseHas('audit_logs', [
+        'action' => 'farm.owner_password_reset',
+        'auditable_type' => User::class,
+        'auditable_id' => $owner->id,
+    ]);
+});
+
+test('a platform user without the password reset permission is refused', function () {
+    $role = Role::firstOrCreate(['name' => 'Farm Viewer', 'guard_name' => 'api']);
+    $role->syncPermissions(['platform.access']);
+    $user = User::factory()->create();
+    $user->assignRole($role);
+    $tenant = Tenant::factory()->create();
+
+    $this->withHeader('Authorization', 'Bearer '.$user->createToken('test')->plainTextToken)
+        ->postJson('/api/v1/seller/farms/'.$tenant->id.'/owner/reset-password')
+        ->assertStatus(403)
+        ->assertJsonPath('error.code', 'forbidden');
 });
 
 test('farm owner can still create their own farm', function () {
@@ -245,6 +397,7 @@ test('farm owner receives 403 for seller farm routes', function () {
         ['DELETE', '/api/v1/seller/farms/'.$tenant->id, []],
         ['POST', '/api/v1/seller/farms/'.$tenant->id.'/subscription', ['plan_code' => 'growth']],
         ['POST', '/api/v1/seller/farms/'.$tenant->id.'/subscription/cancel', []],
+        ['POST', '/api/v1/seller/farms/'.$tenant->id.'/owner/reset-password', []],
         ['POST', '/api/v1/seller/farms/'.$tenant->id.'/impersonate', ['reason' => 'Forbidden attempt']],
     ];
 
