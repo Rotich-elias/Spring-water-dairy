@@ -43,7 +43,6 @@ class SellerPlansController extends Controller
             'name' => $data['name'],
             'description' => $data['description'] ?? null,
             'price_monthly' => $data['price_monthly'] ?? 0,
-            'provider_price_id' => $data['provider_price_id'] ?? null,
             'limits' => $data['limits'] ?? [],
             'is_active' => $data['is_active'] ?? true,
             'sort_order' => $data['sort_order'] ?? 0,
@@ -60,6 +59,11 @@ class SellerPlansController extends Controller
 
         if (($data['is_active'] ?? null) === false) {
             $this->guardDeactivation($plan);
+        }
+
+        if (array_key_exists('limits', $data)) {
+            $currentLimits = is_array($plan->limits) ? $plan->limits : [];
+            $data['limits'] = array_merge($currentLimits, $data['limits']);
         }
 
         $plan->fill($data);

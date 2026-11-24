@@ -19,11 +19,6 @@ class Subscription extends Model
         'ends_at',
         'canceled_at',
         'current_period_end',
-        'provider',
-        'provider_customer_id',
-        'provider_subscription_id',
-        'provider_email_token',
-        'provider_plan_code',
         'payment_status',
         'last_payment_at',
     ];

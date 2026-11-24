@@ -14,13 +14,6 @@ return [
     |
     */
 
-    'paystack' => [
-        'base_uri' => env('PAYSTACK_BASE_URI', 'https://api.paystack.co'),
-        'secret_key' => env('PAYSTACK_SECRET_KEY'),
-        'webhook_secret' => env('PAYSTACK_WEBHOOK_SECRET'),
-        'callback_url' => env('PAYSTACK_CALLBACK_URL'),
-    ],
-
     'postmark' => [
         'key' => env('POSTMARK_API_KEY'),
     ],

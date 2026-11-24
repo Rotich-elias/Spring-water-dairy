@@ -32,6 +32,7 @@ class RoleSeeder extends Seeder
         'platform.access', 'site.view', 'site.update',
         'plans.create', 'plans.update', 'plans.delete',
         'subscriptions.manage', 'inquiries.view', 'inquiries.manage',
+        'plan_requests.view', 'plan_requests.manage',
         'impersonate', 'farms.provision', 'farms.delete',
     ];
 

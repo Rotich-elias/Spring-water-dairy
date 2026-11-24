@@ -15,7 +15,6 @@ class Plan extends Model
         'name',
         'description',
         'price_monthly',
-        'provider_price_id',
         'limits',
         'is_active',
         'sort_order',

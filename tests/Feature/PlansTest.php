@@ -1,5 +1,7 @@
 <?php
 
+use App\Domain\Billing\Services\PlanService;
+use App\Domain\Tenancy\Services\TenantService;
 use Carbon\Carbon;
 
 test('plan catalog is public', function () {
@@ -45,10 +47,10 @@ test('plan catalog still marks the current plan for signed-in users', function (
 
 test('plan catalog marks the subscribed plan current for signed-in users', function () {
     $token = $this->authenticateAsOwner();
-
-    $this->withHeader('Authorization', 'Bearer '.$token)
-        ->postJson('/api/v1/billing/subscribe', ['plan_code' => 'growth'])
-        ->assertOk();
+    app(PlanService::class)->subscribeForTenant(
+        app(TenantService::class)->ensureDefaultTenant(),
+        'growth'
+    );
 
     $response = $this->withHeader('Authorization', 'Bearer '.$token)
         ->getJson('/api/v1/plans')
@@ -65,10 +67,10 @@ test('plan catalog marks the subscribed plan current for signed-in users', funct
 
 test('plan catalog follows billing fallback when a cancelled period ends', function () {
     $token = $this->authenticateAsOwner();
-
-    $this->withHeader('Authorization', 'Bearer '.$token)
-        ->postJson('/api/v1/billing/subscribe', ['plan_code' => 'growth'])
-        ->assertOk();
+    app(PlanService::class)->subscribeForTenant(
+        app(TenantService::class)->ensureDefaultTenant(),
+        'growth'
+    );
 
     $this->withHeader('Authorization', 'Bearer '.$token)
         ->postJson('/api/v1/billing/cancel')

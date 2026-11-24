@@ -2,6 +2,8 @@
 
 return [
 
+    'currency' => env('BILLING_CURRENCY', 'KES'),
+
     /*
     |--------------------------------------------------------------------------
     | Default tenant

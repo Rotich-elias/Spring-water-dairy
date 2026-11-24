@@ -2,13 +2,11 @@
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Domain\Billing\Services\CheckoutService;
+use App\Domain\Billing\Services\PlanRequestService;
 use App\Domain\Billing\Services\PlanService;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\CheckoutRequest;
 use App\Http\Requests\SubscriptionStoreRequest;
-use App\Http\Resources\CheckoutSessionResource;
-use App\Http\Resources\PaymentResource;
+use App\Http\Resources\PlanChangeRequestResource;
 use App\Http\Resources\PlanResource;
 use App\Http\Resources\SubscriptionResource;
 use Illuminate\Http\JsonResponse;
@@ -17,7 +15,7 @@ class BillingController extends Controller
 {
     public function __construct(
         private PlanService $plans,
-        private CheckoutService $checkout,
+        private PlanRequestService $requests,
     ) {}
 
     public function index(): JsonResponse
@@ -32,17 +30,6 @@ class BillingController extends Controller
         $this->authorize('billing.view');
 
         return $this->summaryResponse();
-    }
-
-    public function checkout(CheckoutRequest $request): JsonResponse
-    {
-        $this->authorize('billing.manage');
-
-        $session = $this->checkout->start($request->validated()['plan_code']);
-
-        return response()->json([
-            'data' => new CheckoutSessionResource($session),
-        ], 201);
     }
 
     public function subscribe(SubscriptionStoreRequest $request): JsonResponse
@@ -64,6 +51,7 @@ class BillingController extends Controller
     private function summaryResponse(): JsonResponse
     {
         $summary = $this->plans->summary();
+        $planRequest = $this->requests->activeForTenant($summary['subscription']->tenant_id);
 
         return response()->json([
             'data' => [
@@ -73,12 +61,9 @@ class BillingController extends Controller
                 'limits' => $summary['limits'],
                 'usage' => $summary['usage'],
                 'can_create' => $summary['can_create'],
-                'pending_checkout' => $summary['pending_checkout'] === null
+                'plan_request' => $planRequest === null
                     ? null
-                    : new CheckoutSessionResource($summary['pending_checkout']),
-                'last_payment' => $summary['last_payment'] === null
-                    ? null
-                    : new PaymentResource($summary['last_payment']),
+                    : new PlanChangeRequestResource($planRequest),
             ],
         ]);
     }

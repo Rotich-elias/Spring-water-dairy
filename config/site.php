@@ -58,6 +58,7 @@ return [
         'business_phone' => ['value' => '+254 700 000 000', 'type' => 'string', 'group' => 'branding', 'is_public' => true],
         'business_address' => ['value' => 'Nairobi, Kenya', 'type' => 'string', 'group' => 'branding', 'is_public' => true],
         'business_logo_path' => ['value' => '/images/farm-logo.png', 'type' => 'string', 'group' => 'branding', 'is_public' => true],
+        'invoice_payment_instructions' => ['value' => 'Pay the invoice total by bank transfer or mobile money. Quote the invoice number as the payment reference, then contact the TetoDairy team to confirm payment.', 'type' => 'string', 'group' => 'billing', 'is_public' => false],
         'hero_title' => ['value' => 'Modern dairy management for every farm', 'type' => 'string', 'group' => 'content', 'is_public' => true],
         'hero_subtitle' => ['value' => 'Keep every cow, litre and shilling accounted for in one place.', 'type' => 'string', 'group' => 'content', 'is_public' => true],
         'final_title' => ['value' => 'Ready to modernise your dairy?', 'type' => 'string', 'group' => 'content', 'is_public' => true],

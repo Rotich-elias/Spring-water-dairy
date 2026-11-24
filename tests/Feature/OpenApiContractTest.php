@@ -16,6 +16,11 @@ test('every api route is documented in the openapi contract', function () {
     foreach ($spec['paths'] as $path => $operations) {
         $normalizedPath = preg_replace('/\{[^}]+\}/', '{}', $path);
         foreach (array_keys($operations) as $method) {
+            if (! in_array(strtoupper($method), ['GET', 'POST', 'PATCH', 'DELETE', 'PUT'], true)) {
+                // OpenAPI path-item keys such as `parameters` are not operations.
+                continue;
+            }
+
             $documented[] = strtoupper($method).' '.$normalizedPath;
         }
     }

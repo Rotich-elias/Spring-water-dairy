@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\AppearanceController;
 use App\Http\Controllers\Api\V1\AuditController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BillingController;
+use App\Http\Controllers\Api\V1\BillingPlanRequestController;
 use App\Http\Controllers\Api\V1\BulkTankRecordsController;
 use App\Http\Controllers\Api\V1\CalfRecordsController;
 use App\Http\Controllers\Api\V1\CalvingsController;
@@ -29,6 +30,7 @@ use App\Http\Controllers\Api\V1\SellerController;
 use App\Http\Controllers\Api\V1\SellerFarmsController;
 use App\Http\Controllers\Api\V1\SellerImpersonationController;
 use App\Http\Controllers\Api\V1\SellerInquiryController;
+use App\Http\Controllers\Api\V1\SellerPlanRequestsController;
 use App\Http\Controllers\Api\V1\SellerPlansController;
 use App\Http\Controllers\Api\V1\SellerSiteController;
 use App\Http\Controllers\Api\V1\SemenStrawsController;
@@ -43,7 +45,6 @@ use App\Http\Controllers\Api\V1\TenantsController;
 use App\Http\Controllers\Api\V1\TreatmentsController;
 use App\Http\Controllers\Api\V1\UsersController;
 use App\Http\Controllers\Api\V1\VaccinationsController;
-use App\Http\Controllers\Api\V1\WebhookController;
 use App\Http\Controllers\Api\V1\WeightsController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -59,11 +60,6 @@ Route::aliasMiddleware('optional.auth', function (Request $request, Closure $nex
 
 // All Phase 1 endpoints live under /api/v1.
 Route::prefix('v1')->name('api.v1.')->group(function () {
-
-    // Signed payment events must be accepted without a user session or a
-    // resolved farm; the webhook payload carries its own tenant context.
-    Route::post('/webhooks/paystack', [WebhookController::class, 'paystack'])
-        ->name('webhooks.paystack');
 
     Route::middleware('throttle:login')->group(function () {
         Route::post('/auth/login', [AuthController::class, 'login']);
@@ -108,6 +104,15 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::patch('/plans/{plan}', [SellerPlansController::class, 'update'])->name('plans.update');
             Route::delete('/plans/{plan}', [SellerPlansController::class, 'destroy'])->name('plans.destroy');
 
+            Route::get('/plan-requests', [SellerPlanRequestsController::class, 'index'])->name('plan-requests.index');
+            Route::get('/plan-requests/{planRequest}/invoice', [SellerPlanRequestsController::class, 'invoice'])
+                ->middleware('throttle:10,1')
+                ->name('plan-requests.invoice');
+            Route::post('/plan-requests/{planRequest}/invoice', [SellerPlanRequestsController::class, 'issueInvoice'])->name('plan-requests.invoice.store');
+            Route::post('/plan-requests/{planRequest}/paid', [SellerPlanRequestsController::class, 'markPaid'])->name('plan-requests.paid');
+            Route::post('/plan-requests/{planRequest}/approve', [SellerPlanRequestsController::class, 'approve'])->name('plan-requests.approve');
+            Route::post('/plan-requests/{planRequest}/reject', [SellerPlanRequestsController::class, 'reject'])->name('plan-requests.reject');
+
             Route::get('/farms', [SellerFarmsController::class, 'index'])->name('farms.index');
             Route::post('/farms', [SellerFarmsController::class, 'store'])->name('farms.store');
             Route::patch('/farms/{tenant}', [SellerFarmsController::class, 'update'])->name('farms.update');
@@ -129,9 +134,13 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::prefix('billing')->name('billing.')->group(function () {
                 Route::get('/', [BillingController::class, 'index'])->name('index');
                 Route::get('/usage', [BillingController::class, 'usage'])->name('usage');
-                Route::post('/checkout', [BillingController::class, 'checkout'])
+                Route::post('/plan-requests', [BillingPlanRequestController::class, 'store'])
                     ->middleware('throttle:10,1')
-                    ->name('checkout');
+                    ->name('plan-requests.store');
+                Route::delete('/plan-requests/{planRequest}', [BillingPlanRequestController::class, 'destroy'])->name('plan-requests.destroy');
+                Route::get('/plan-requests/{planRequest}/invoice', [BillingPlanRequestController::class, 'invoice'])
+                    ->middleware('throttle:10,1')
+                    ->name('plan-requests.invoice');
                 Route::post('/subscribe', [BillingController::class, 'subscribe'])->name('subscribe');
                 Route::post('/cancel', [BillingController::class, 'cancel'])->name('cancel');
             });

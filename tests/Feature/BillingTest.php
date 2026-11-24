@@ -52,27 +52,36 @@ test('starter plan limit rejects creating beyond its animal allowance', function
     }
 });
 
-test('subscribing to growth raises the plan limits', function () {
-    $this->withHeader('Authorization', 'Bearer '.$this->token)
+test('a platform-provisioned growth plan raises the plan limits', function () {
+    $growth = Plan::where('code', 'growth')->firstOrFail();
+    app(PlanService::class)->subscribeForTenant($this->tenant, $growth->code);
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->getJson('/api/v1/billing')
         ->assertStatus(200);
 
-    $growth = Plan::where('code', 'growth')->firstOrFail();
-
-    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
-        ->postJson('/api/v1/billing/subscribe', ['plan_code' => $growth->code]);
-
-    $response->assertStatus(200);
     expect($response->json('data.plan.code'))->toBe('growth');
     expect($response->json('data.limits.animals'))->toBe(500);
 
     expect(app(PlanService::class)->limit('animals'))->toBe(500);
 });
 
-test('cancelling keeps the current plan until the period ends', function () {
+test('a farm cannot directly activate a paid plan', function () {
+    $growth = Plan::where('code', 'growth')->firstOrFail();
+
     $this->withHeader('Authorization', 'Bearer '.$this->token)
-        ->postJson('/api/v1/billing/subscribe', ['plan_code' => 'growth'])
-        ->assertOk();
+        ->postJson('/api/v1/billing/subscribe', ['plan_code' => $growth->code])
+        ->assertStatus(422)
+        ->assertJsonPath('error.fields.plan_code.0', 'The selected plan is invalid.');
+
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->getJson('/api/v1/billing')
+        ->assertOk()
+        ->assertJsonPath('data.plan.code', 'starter');
+});
+
+test('cancelling keeps the current plan until the period ends', function () {
+    app(PlanService::class)->subscribeForTenant($this->tenant, 'growth');
 
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->postJson('/api/v1/billing/cancel')
@@ -101,9 +110,7 @@ test('cancelling keeps the current plan until the period ends', function () {
 });
 
 test('subscribing clears a scheduled cancellation', function () {
-    $this->withHeader('Authorization', 'Bearer '.$this->token)
-        ->postJson('/api/v1/billing/subscribe', ['plan_code' => 'growth'])
-        ->assertOk();
+    app(PlanService::class)->subscribeForTenant($this->tenant, 'growth');
 
     $cancelled = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->postJson('/api/v1/billing/cancel')
@@ -152,6 +159,6 @@ test('a user without billing permission cannot subscribe', function () {
     $token = $viewer->createToken('test')->plainTextToken;
 
     $this->withHeader('Authorization', 'Bearer '.$token)
-        ->postJson('/api/v1/billing/subscribe', ['plan_code' => 'growth'])
+        ->postJson('/api/v1/billing/subscribe', ['plan_code' => 'starter'])
         ->assertStatus(403);
 });
