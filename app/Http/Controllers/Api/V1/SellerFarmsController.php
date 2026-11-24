@@ -14,10 +14,13 @@ use App\Http\Requests\FarmUpdateRequest;
 use App\Http\Requests\SubscriptionAssignRequest;
 use App\Http\Resources\SubscriptionResource;
 use App\Http\Resources\TenantResource;
+use App\Models\Impersonation;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class SellerFarmsController extends Controller
 {
@@ -127,6 +130,51 @@ class SellerFarmsController extends Controller
 
         return response()->json([
             'data' => new TenantResource($tenant->setAttribute('current', false)),
+        ]);
+    }
+
+    public function destroy(Tenant $tenant): JsonResponse
+    {
+        $this->authorizePlatform('farms.delete');
+
+        $previous = $this->context->tenant();
+        $this->context->clear();
+
+        try {
+            DB::transaction(function () use ($tenant): void {
+                Impersonation::query()
+                    ->where('tenant_id', $tenant->id)
+                    ->whereNull('ended_at')
+                    ->get()
+                    ->each(function (Impersonation $impersonation): void {
+                        if ($impersonation->token_id !== null) {
+                            PersonalAccessToken::query()->whereKey($impersonation->token_id)->delete();
+                        }
+
+                        $impersonation->forceFill(['ended_at' => now()])->save();
+                    });
+
+                $tenant->users()->detach();
+                User::query()->where('current_tenant_id', $tenant->id)->update(['current_tenant_id' => null]);
+                Subscription::query()->where('tenant_id', $tenant->id)->delete();
+
+                // Keep the soft-deleted row for audit, but release its slug so
+                // another farm can be provisioned with the same name.
+                $tenant->forceFill([
+                    'slug' => Str::limit($tenant->slug.'-deleted-'.$tenant->id, 120, ''),
+                ])->save();
+                $tenant->delete();
+            });
+        } finally {
+            if ($previous) {
+                $this->context->set($previous);
+            } else {
+                $this->context->clear();
+            }
+        }
+
+        return response()->json([
+            'data' => ['id' => $tenant->id, 'deleted' => true],
         ]);
     }
 

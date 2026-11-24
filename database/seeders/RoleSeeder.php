@@ -32,7 +32,7 @@ class RoleSeeder extends Seeder
         'platform.access', 'site.view', 'site.update',
         'plans.create', 'plans.update', 'plans.delete',
         'subscriptions.manage', 'inquiries.view', 'inquiries.manage',
-        'impersonate', 'farms.provision',
+        'impersonate', 'farms.provision', 'farms.delete',
     ];
 
     public function run(): void

@@ -5,6 +5,7 @@ use App\Domain\Tenancy\Models\Plan;
 use App\Domain\Tenancy\Models\Subscription;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
+use App\Models\Impersonation;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -143,6 +144,17 @@ test('platform admin can update a farm name and status', function () {
     expect($tenant->status)->toBe('suspended');
 });
 
+test('platform admin cannot set an unsupported farm status', function () {
+    $tenant = Tenant::factory()->create();
+
+    $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
+        ->patchJson('/api/v1/seller/farms/'.$tenant->id, ['status' => 'inactive'])
+        ->assertStatus(422)
+        ->assertJsonPath('error.code', 'validation_failed');
+
+    expect($tenant->refresh()->status)->toBe('active');
+});
+
 test('platform admin can assign and cancel a farm subscription', function () {
     $tenant = Tenant::factory()->create();
 
@@ -178,6 +190,46 @@ test('platform admin cannot assign an inactive plan with 422', function () {
         ->assertJsonPath('error.code', 'validation_failed');
 });
 
+test('platform admin deletes a farm and revokes its access', function () {
+    $tenant = Tenant::factory()->create();
+    $owner = User::factory()->create();
+    $owner->forceFill(['current_tenant_id' => $tenant->id])->save();
+    $tenant->users()->attach($owner->id, ['role' => 'Owner', 'is_owner' => true]);
+    Subscription::factory()->for($tenant)->create();
+
+    $admin = User::where('email', config('site.platform_admin_email'))->firstOrFail();
+    $impersonation = Impersonation::create([
+        'impersonator_id' => $admin->id,
+        'user_id' => $owner->id,
+        'tenant_id' => $tenant->id,
+        'reason' => 'Delete farm test',
+        'expires_at' => now()->addMinutes(15),
+    ]);
+
+    $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
+        ->deleteJson('/api/v1/seller/farms/'.$tenant->id)
+        ->assertOk()
+        ->assertJsonPath('data.id', $tenant->id)
+        ->assertJsonPath('data.deleted', true);
+
+    expect(Tenant::find($tenant->id))->toBeNull();
+    expect(Tenant::withTrashed()->find($tenant->id)?->trashed())->toBeTrue();
+    expect(DB::table('tenant_user')->where('tenant_id', $tenant->id)->exists())->toBeFalse();
+    expect(Subscription::query()->where('tenant_id', $tenant->id)->exists())->toBeFalse();
+    expect($owner->refresh()->current_tenant_id)->toBeNull();
+    expect($impersonation->refresh()->ended_at)->not->toBeNull();
+    expect(Tenant::withTrashed()->find($tenant->id)?->slug)->not->toBe($tenant->slug);
+
+    $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
+        ->postJson('/api/v1/seller/farms', [
+            'name' => 'Reused Slug Farm',
+            'slug' => $tenant->slug,
+            'owner_email' => 'reused-slug-owner@example.com',
+        ])
+        ->assertStatus(201)
+        ->assertJsonPath('data.slug', $tenant->slug);
+});
+
 test('farm owner receives 403 for seller farm routes', function () {
     $tenant = Tenant::factory()->create();
 
@@ -185,6 +237,7 @@ test('farm owner receives 403 for seller farm routes', function () {
         ['GET', '/api/v1/seller/farms', []],
         ['POST', '/api/v1/seller/farms', ['name' => 'Forbidden', 'owner_email' => 'forbidden@example.com']],
         ['PATCH', '/api/v1/seller/farms/'.$tenant->id, ['name' => 'Forbidden']],
+        ['DELETE', '/api/v1/seller/farms/'.$tenant->id, []],
         ['POST', '/api/v1/seller/farms/'.$tenant->id.'/subscription', ['plan_code' => 'growth']],
         ['POST', '/api/v1/seller/farms/'.$tenant->id.'/subscription/cancel', []],
         ['POST', '/api/v1/seller/farms/'.$tenant->id.'/impersonate', ['reason' => 'Forbidden attempt']],

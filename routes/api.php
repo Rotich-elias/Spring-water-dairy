@@ -105,6 +105,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::get('/farms', [SellerFarmsController::class, 'index'])->name('farms.index');
             Route::post('/farms', [SellerFarmsController::class, 'store'])->name('farms.store');
             Route::patch('/farms/{tenant}', [SellerFarmsController::class, 'update'])->name('farms.update');
+            Route::delete('/farms/{tenant}', [SellerFarmsController::class, 'destroy'])->name('farms.destroy');
             Route::post('/farms/{tenant}/subscription', [SellerFarmsController::class, 'subscribe'])->name('farms.subscribe');
             Route::post('/farms/{tenant}/subscription/cancel', [SellerFarmsController::class, 'cancel'])->name('farms.cancel');
             Route::post('/farms/{tenant}/impersonate', [SellerImpersonationController::class, 'store'])->name('impersonations.store');
