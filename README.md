@@ -25,6 +25,13 @@ The API is served at <http://localhost:8000/api/v1>. The seeded Owner uses
 `APP_OWNER_EMAIL` / `APP_OWNER_PASSWORD` from `.env` (defaults:
 `owner@springwaterdairy.local` / `change-me-immediately`; change it immediately).
 
+The platform-wide seller account uses `APP_PLATFORM_ADMIN_EMAIL` /
+`APP_PLATFORM_ADMIN_PASSWORD` (defaults: `platform@tetodairy.local` /
+`change-me-immediately`). It manages global site settings, plans, farms and
+contact inquiries, and is never a member of a farm. The farm Owner remains
+scoped to its tenant and cannot access platform endpoints. Change both default
+passwords before deploying.
+
 For a quick SQLite setup, set:
 
 ```dotenv

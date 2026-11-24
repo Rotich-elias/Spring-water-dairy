@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\V1\BillingController;
 use App\Http\Controllers\Api\V1\BulkTankRecordsController;
 use App\Http\Controllers\Api\V1\CalfRecordsController;
 use App\Http\Controllers\Api\V1\CalvingsController;
+use App\Http\Controllers\Api\V1\ContactInquiryController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\HeatsController;
 use App\Http\Controllers\Api\V1\ImagesController;
@@ -24,10 +25,17 @@ use App\Http\Controllers\Api\V1\PlansController;
 use App\Http\Controllers\Api\V1\PregnancyChecksController;
 use App\Http\Controllers\Api\V1\ReportsController;
 use App\Http\Controllers\Api\V1\RolesController;
+use App\Http\Controllers\Api\V1\SellerController;
+use App\Http\Controllers\Api\V1\SellerFarmsController;
+use App\Http\Controllers\Api\V1\SellerImpersonationController;
+use App\Http\Controllers\Api\V1\SellerInquiryController;
+use App\Http\Controllers\Api\V1\SellerPlansController;
+use App\Http\Controllers\Api\V1\SellerSiteController;
 use App\Http\Controllers\Api\V1\SemenStrawsController;
 use App\Http\Controllers\Api\V1\ServicesController;
 use App\Http\Controllers\Api\V1\SettingsController;
 use App\Http\Controllers\Api\V1\SetupController;
+use App\Http\Controllers\Api\V1\SiteController;
 use App\Http\Controllers\Api\V1\SyncController;
 use App\Http\Controllers\Api\V1\SystemHealthController;
 use App\Http\Controllers\Api\V1\TasksController;
@@ -60,6 +68,10 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     // who are signed in.
     Route::middleware('optional.auth')->group(function () {
         Route::get('/plans', [PlansController::class, 'index'])->name('plans.index');
+        Route::get('/site', [SiteController::class, 'index'])->name('site.index');
+        Route::post('/contact-inquiries', [ContactInquiryController::class, 'store'])
+            ->middleware('throttle:5,1')
+            ->name('contact-inquiries.store');
     });
 
     Route::middleware('auth:sanctum')->group(function () {
@@ -73,6 +85,37 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::get('/{tenant}', [TenantsController::class, 'show'])->name('show');
             Route::patch('/{tenant}', [TenantsController::class, 'update'])->name('update');
             Route::post('/{tenant}/switch', [TenantsController::class, 'switch'])->name('switch');
+        });
+
+        // Platform-level seller console. Deliberately outside the tenant
+        // middleware: these routes operate across farms and are gated by
+        // Spatie permissions on the Platform Admin role.
+        Route::prefix('seller')->name('seller.')->group(function () {
+            Route::get('/', [SellerController::class, 'index'])->name('index');
+
+            Route::get('/site', [SellerSiteController::class, 'index'])->name('site.index');
+            Route::patch('/site', [SellerSiteController::class, 'update'])->name('site.update');
+
+            Route::get('/plans', [SellerPlansController::class, 'index'])->name('plans.index');
+            Route::post('/plans', [SellerPlansController::class, 'store'])->name('plans.store');
+            Route::get('/plans/{plan}', [SellerPlansController::class, 'show'])->name('plans.show');
+            Route::patch('/plans/{plan}', [SellerPlansController::class, 'update'])->name('plans.update');
+            Route::delete('/plans/{plan}', [SellerPlansController::class, 'destroy'])->name('plans.destroy');
+
+            Route::get('/farms', [SellerFarmsController::class, 'index'])->name('farms.index');
+            Route::post('/farms', [SellerFarmsController::class, 'store'])->name('farms.store');
+            Route::patch('/farms/{tenant}', [SellerFarmsController::class, 'update'])->name('farms.update');
+            Route::post('/farms/{tenant}/subscription', [SellerFarmsController::class, 'subscribe'])->name('farms.subscribe');
+            Route::post('/farms/{tenant}/subscription/cancel', [SellerFarmsController::class, 'cancel'])->name('farms.cancel');
+            Route::post('/farms/{tenant}/impersonate', [SellerImpersonationController::class, 'store'])->name('impersonations.store');
+
+            Route::get('/impersonations', [SellerImpersonationController::class, 'index'])->name('impersonations.index');
+            Route::post('/impersonations/{impersonation}/end', [SellerImpersonationController::class, 'end'])->name('impersonations.end');
+
+            Route::get('/inquiries', [SellerInquiryController::class, 'index'])->name('inquiries.index');
+            Route::get('/inquiries/{inquiry}', [SellerInquiryController::class, 'show'])->name('inquiries.show');
+            Route::patch('/inquiries/{inquiry}', [SellerInquiryController::class, 'update'])->name('inquiries.update');
+            Route::delete('/inquiries/{inquiry}', [SellerInquiryController::class, 'destroy'])->name('inquiries.destroy');
         });
 
         Route::middleware('tenant')->group(function () {

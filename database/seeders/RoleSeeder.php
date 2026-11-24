@@ -11,14 +11,28 @@ class RoleSeeder extends Seeder
 {
     /**
      * Permissions introduced with multi-tenant farms, billing and appearance.
+     * Tenant deletion is reserved for the platform.
      *
      * @var list<string>
      */
     private array $saasPermissions = [
-        'tenants.view', 'tenants.create', 'tenants.update', 'tenants.delete',
+        'tenants.view', 'tenants.create', 'tenants.update',
         'appearance.view', 'appearance.update',
         'billing.view', 'billing.manage',
         'plans.view',
+    ];
+
+    /**
+     * Permissions reserved for the platform-level seller console. Farm roles
+     * never receive these.
+     *
+     * @var list<string>
+     */
+    private array $platformPermissions = [
+        'platform.access', 'site.view', 'site.update',
+        'plans.create', 'plans.update', 'plans.delete',
+        'subscriptions.manage', 'inquiries.view', 'inquiries.manage',
+        'impersonate', 'farms.provision',
     ];
 
     public function run(): void
@@ -42,6 +56,9 @@ class RoleSeeder extends Seeder
                 'system.health', 'setup.view', 'setup.complete',
             ],
             'Admin' => [],
+            'Platform Admin' => array_merge($this->platformPermissions, [
+                'plans.view', 'tenants.view', 'tenants.update', 'users.view', 'billing.view',
+            ]),
             'Manager' => [
                 'users.view',
                 'lookups.view', 'lookups.edit',
@@ -94,7 +111,7 @@ class RoleSeeder extends Seeder
         ];
 
         $roles['Owner'] = array_merge($roles['Owner'], $this->saasPermissions);
-        $roles['Admin'] = array_values(array_diff($this->saasPermissions, ['tenants.delete', 'billing.manage']));
+        $roles['Admin'] = array_values(array_diff($this->saasPermissions, ['billing.manage']));
         $roles['Manager'] = array_merge($roles['Manager'], [
             'tenants.view', 'appearance.view', 'billing.view', 'plans.view',
         ]);

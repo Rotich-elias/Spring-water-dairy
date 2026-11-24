@@ -34,6 +34,16 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
+     * Authenticate as the seeded Platform Admin and return the bearer token.
+     */
+    protected function authenticateAsPlatformAdmin(): string
+    {
+        $admin = User::where('email', config('site.platform_admin_email'))->firstOrFail();
+
+        return $admin->createToken('test')->plainTextToken;
+    }
+
+    /**
      * Make an authenticated JSON request.
      *
      * @return Response

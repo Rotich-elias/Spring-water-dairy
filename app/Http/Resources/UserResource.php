@@ -18,6 +18,8 @@ class UserResource extends JsonResource
             'email' => $this->email,
             'phone' => $this->phone,
             'role' => $tenantRole ?? $this->getRoleNames()->first(),
+            'is_platform_admin' => $this->hasRole('Platform Admin', 'api'),
+            'is_seller' => $this->hasRole('Platform Admin', 'api'),
             'permissions' => $this->permissionsFor($tenantRole),
             'email_verified_at' => $this->email_verified_at?->toISOString(),
             'created_at' => $this->created_at?->toISOString(),

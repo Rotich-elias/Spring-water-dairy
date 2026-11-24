@@ -100,6 +100,47 @@ class TenantService
     }
 
     /**
+     * Provision a farm for an explicitly supplied owner. The caller's active
+     * tenant and current_tenant_id are deliberately left untouched.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function provisionFor(array $data, User $owner): Tenant
+    {
+        return DB::transaction(function () use ($data, $owner): Tenant {
+            $name = (string) ($data['name'] ?? 'New Farm');
+
+            $tenant = Tenant::create([
+                'name' => $name,
+                'slug' => $this->uniqueSlug((string) ($data['slug'] ?? Str::slug($name))),
+                'status' => (string) ($data['status'] ?? 'active'),
+                'owner_id' => $owner->id,
+            ]);
+
+            $tenant->users()->attach($owner->id, [
+                'role' => 'Owner',
+                'is_owner' => true,
+            ]);
+
+            $previous = $this->context->tenant();
+            $this->context->set($tenant);
+
+            try {
+                $this->seedDefaults($tenant);
+                $this->ensureStarterSubscription($tenant);
+            } finally {
+                if ($previous) {
+                    $this->context->set($previous);
+                } else {
+                    $this->context->clear();
+                }
+            }
+
+            return $tenant;
+        });
+    }
+
+    /**
      * Seed a tenant's settings and reference data without leaking the tenant
      * into the surrounding execution lifecycle.
      */

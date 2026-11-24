@@ -48,5 +48,28 @@ class DatabaseSeeder extends Seeder
 
         // Attach the Owner now that the account exists; safe to re-run.
         $tenants->ensureDefaultTenant();
+
+        // Global settings have no tenant scope and back the public site.
+        $this->call(SiteSettingSeeder::class);
+
+        // Created after the last tenant bootstrap so the platform admin is
+        // never attached to a farm or assigned a current tenant. Re-seeding
+        // never overwrites an existing account's password.
+        $platformAdminEmail = (string) config('site.platform_admin_email');
+        $platformAdminPassword = (string) config('site.platform_admin_password');
+
+        $platformAdmin = User::firstOrCreate(
+            ['email' => $platformAdminEmail],
+            [
+                'name' => 'Platform Admin',
+                'password' => bcrypt($platformAdminPassword),
+            ],
+        );
+        $platformAdmin->assignRole(Role::firstOrCreate(
+            ['name' => 'Platform Admin', 'guard_name' => 'api'],
+        ));
+
+        // Role changes must be visible to the next authorization check.
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 }
